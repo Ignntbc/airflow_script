@@ -1,0 +1,42 @@
+1. Создайте пользователей и группы:
+ - Создайте пользователей airflow_deploy и airflow:
+  sudo groupadd airflow
+  sudo useradd -m -g airflow airflow
+  sudo useradd -m -g airflow airflow_deploy
+
+2. Создайте структуру директорий:
+ - Выполните:
+  sudo mkdir -p /app/airflow_deploy/{dags,jar,keys,keytab,scripts,csv,user_data}
+  sudo mkdir -p /app/airflow/{dags,jar,keys,keytab,scripts,csv,user_data}
+ - Проверьте, что все папки созданы.
+
+3. Назначьте права и владельцев:
+ - Для airflow_deploy:
+  sudo chown -R airflow_deploy:airflow /app/airflow_deploy
+ - Для airflow:
+  sudo chown -R airflow:airflow /app/airflow
+
+4. Настройте SSH-доступ:
+ - Сгенерируйте ключ для пользователя airflow_deploy:
+  sudo -u airflow_deploy ssh-keygen -t rsa -b 2048 -N "" -f /home/airflow_deploy/.ssh/id_rsa
+ - Добавьте публичный ключ в authorized_keys:
+  sudo -u airflow_deploy cat /home/airflow_deploy/.ssh/id_rsa.pub >> /home/airflow_deploy/.ssh/authorized_keys
+ - Проверьте, что ssh airflow_deploy@localhost работает без пароля.
+
+5. Установите необходимые пакеты:
+ - sudo apt update
+ - sudo apt install python3 python3-pip rsync openssh-server sudo
+
+6. Создайте тестовые файлы и description.json:
+ - Создайте /app/description.json с нужной структурой (можно взять пример из боевого окружения).
+ - Создайте несколько файлов в  для теста.
+
+7. Скопируйте ваш скрипт на сервер:
+ - Поместите airflow_sync_dags.py в удобное место, например, /home/airflow_deploy/.
+
+8. Дайте права на запуск:
+ - chmod +x /home/airflow_deploy/airflow_sync_dags.py
+
+9. Проверьте запуск:
+ - Запустите скрипт с нужными параметрами от пользователя airflow_deploy:
+  sudo -u airflow_deploy python3 /home/airflow_deploy/airflow_sync_dags.py -h
