@@ -819,6 +819,7 @@ def check_param_run(ALL_ERROR):
 
                                 
                                 result_command = os.popen(f'rsync -a --checksum -nrogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@{i_all_hosts}:/app/airflow/{i_script_args}/').read()
+                                print(i_script_args)
                                 result_command_string = str(result_command)
                                 if "rsync error" in result_command_string:
                                     with open("/app/airflow_deploy/log/deploy.log", "a") as file_log:
