@@ -799,7 +799,7 @@ def check_param_run(ALL_ERROR):
 
                             else:
                                 print("Предположительно падаем тут")
-                                result_command = os.popen(f'rsync --checksum -nrogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@127.0.0.1:/app/airflow/{i_script_args}').read()
+                                result_command = os.popen(f'rsync -a --checksum -nrogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@127.0.0.1:/app/airflow/{i_script_args}').read()
 
                                 if "rsync error" in result_command:
 
@@ -811,11 +811,23 @@ def check_param_run(ALL_ERROR):
 
                                     sys.exit(1)
                                 print("И тут")
-                                result_command = os.popen(f'rsync --checksum -rogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@127.0.0.1:/app/airflow/{i_script_args}').read()
+                                result_command = os.popen(f'rsync -a --checksum -rogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@127.0.0.1:/app/airflow/{i_script_args}').read()
 
                                 with open("/app/airflow_deploy/log/deploy.log", "a") as file_log:
 
                                     file_log.write(f"{current_datetime_now} {real_name} {i_all_hosts} Добавлена директория: /app/airflow/{i_script_args}\n\n")
+
+                                
+                                result_command = os.popen(f'rsync --checksum -nrogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@{i_all_hosts}:/app/airflow/{i_script_args}').read()
+                                result_command_string = str(result_command)
+                                if "rsync error" in result_command_string:
+                                    with open("/app/airflow_deploy/log/deploy.log", "a") as file_log:
+                                        file_log.write(f"{current_datetime_now} {real_name} {result_command} \n\n")
+                                    print("1")
+                                    sys.exit(1)
+                                result_command = os.popen(f'rsync --checksum -rogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@{i_all_hosts}:/app/airflow/{i_script_args}').read()
+                                with open("/app/airflow_deploy/log/deploy.log", "a") as file_log:
+                                    file_log.write(f"{current_datetime_now} {real_name} {i_all_hosts} Добавлена директория /app/airflow/{i_script_args}/ \n\n")
 
                 print("0")
 
