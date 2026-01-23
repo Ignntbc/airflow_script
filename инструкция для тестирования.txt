@@ -40,3 +40,16 @@
 9. Проверьте запуск:
  - Запустите скрипт с нужными параметрами от пользователя airflow_deploy:
   sudo -u airflow_deploy python3 /home/airflow_deploy/airflow_sync_dags.py -h
+
+
+Замечания: 
+В папке запуска должна быть папка airflow_deploy/log/ 
+airflow/dags
+
+добавить пользователя в sudousr
+sudo usermod -aG sudo airflow_deploy
+
+Пишется в даг
+
+Проверить права на папки для пользователя airflow_deploy должны быть полные
+
