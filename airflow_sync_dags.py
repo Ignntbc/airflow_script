@@ -14,7 +14,7 @@ from multiprocessing import Process, Queue
 
 PATH_SUM = dict()
 
-size_airflow_deploy = int(os.popen("du -s /app/airflow_deploy/ | cut -f1").read())
+size_airflow_deploy = int(os.popen("du -s app/airflow_deploy | cut -f1").read())
 
 CRITICAL_PERCENT = 80
 
@@ -149,7 +149,7 @@ def param_run_script():
 
 ### CHECK_CLASTER_OR_ONE-WAY
 # with open("/app/app/etc/description.json", "r") as file_description:
-with open("/app/description.json", "r") as file_description:
+with open("description.json", "r") as file_description:
     data_description = json.load(file_description)
 
 if data_description["software"]["app"]['executor'] == "localexecutor":
