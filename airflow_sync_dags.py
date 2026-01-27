@@ -1313,7 +1313,7 @@ def check_param_run(ALL_ERROR):
                             shutil.rmtree(
                                 f"/app/airflow/{elem_list_folders}/{elem_files_and_directories}"
                             )
-
+                            print("DEBUG: Removed directory")
                             REMOVE_FILES_FOLDERS.add(
                                 f"removed /app/airflow/{elem_list_folders}/{elem_files_and_directories}"
                             )
@@ -1337,22 +1337,15 @@ def check_param_run(ALL_ERROR):
 
 ### CHECK ANY FILES IN DIRECTORY
 def check_files_in_dirs(ALL_ERROR):
-
     files_in_dirs = 0
-
+    print("DEBUG: Checking for files in directories")
     for elem_list_folders in list_folders:
-
         for root, dirs, files in os.walk(f"/app/airflow_deploy/{elem_list_folders}"):
-
             files_in_dirs += len(files)
-
             files_in_dirs += len(dirs)
-
             if files_in_dirs > 1:
                 break
-
     if files_in_dirs <= 1:
-
         ALL_ERROR.put(
             f"Ошибка !!! В прикладных директориях /app/airflow_deploy (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса\n\n"
         )
@@ -1844,53 +1837,6 @@ def path_sum_files():
 
 path_sum_files()
 
-# REMOVE DESTITINATION FOLDER
-# def remove_destination_folder(hostname, result_queue):
-
-#     for elem in list_folders:
-
-#         if elem == "dags":
-
-#             result_command_dag = list(os.popen(f"ssh airflow_deploy@{hostname} ls -a /app/airflow/{elem}/").read().split("\n"))
-
-#             result_command_dag.remove(".")
-
-#             result_command_dag.remove("..")
-
-#             result_command_dag.remove("")
-
-#             for elem_dags_dir in result_command_dag:
-
-#                 if "__pycache__" in elem_dags_dir:
-
-#                     continue
-
-#                 result_command_dag = os.popen(f"ssh airflow_deploy@{hostname} rm -rfv /app/airflow/dags/{elem_dags_dir}").read()
-
-#                 result_queue.put(result_command_dag)
-
-#             result_command_dag = os.popen(f"ssh airflow_deploy@{hostname} rm -rfv /app/airflow/dags/sql/*").read()
-
-#             result_queue.put(result_command_dag)
-
-#         else:
-
-#             remote_list_files_folders = os.popen(f"ssh airflow_deploy@{hostname} ls -R /app/airflow/{elem}/").read()
-
-#             result_command = list(os.popen(f"ssh airflow_deploy@{hostname} ls -a /app/airflow/{elem}/").read().split("\n"))
-
-#             result_command.remove(".")
-
-#             result_command.remove("..")
-
-#             result_command.remove("")
-
-#             for elem_result_command in result_command:
-
-#                 result_command = os.popen(f"ssh airflow_deploy@{hostname} rm -rf /app/airflow/{elem}/{elem_result_command}").read()
-
-#                 result_queue.put(result_command)
-
 
 ### SYNC DATA HOST
 def rsync_host(hostname):
@@ -2060,11 +2006,8 @@ if configuration == "one-way":
 
 ################################################################### CLASTER
 if configuration == "claster":
-    print(2)
     all_hosts = schedulers + webs + workers
-    print(all_hosts)
     if "--skipped" not in sys.argv:
-        print(3)
         all_processes_connect_write = [
             Process(target=connect_write, args=(hostname, ALL_ERROR))
             for hostname in all_hosts
@@ -2077,9 +2020,7 @@ if configuration == "claster":
         for process_connect_write in all_processes_connect_write:
 
             process_connect_write.join()
-        print(4)
         check_param_run(ALL_ERROR)
-        print(5)
         all_process_check_files_in_dirs = [
             Process(target=check_files_in_dirs, args=(ALL_ERROR,))
         ]
