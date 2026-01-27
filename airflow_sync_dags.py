@@ -16,6 +16,21 @@ PATH_SUM = dict()
 CRITICAL_PERCENT = 80
 CMD = ["id"]
 
+ARGV_KEYS = ["-c", "-h", "--file", "--dir", "--skipped"]
+# uid_airflow_deploy = pwd.getpwnam("airflow_deploy").pw_uid
+# uid_group_airflow = grp.getgrnam("airflow").gr_gid
+FOLDER_EXTENSION = dict()
+FOLDER_EXTENSION["/app/airflow_deploy/dags/"] = ["py", "json"]
+FOLDER_EXTENSION["/app/airflow_deploy/dags/sql/"] = ["sql"]
+FOLDER_EXTENSION["/app/airflow_deploy/csv/"] = ["csv"]
+FOLDER_EXTENSION["/app/airflow_deploy/jar/"] = ["jar"]
+FOLDER_EXTENSION["/app/airflow_deploy/keys/"] = ["pfx", "p12", "jks", "secret"]
+FOLDER_EXTENSION["/app/airflow_deploy/keytab/"] = ["keytab"]
+GLOBAL_LIST_ERROR = set()
+REMOVE_FILES_FOLDERS = set()
+result_queue = Queue()
+ALL_ERROR = Queue()
+
 
 size_airflow_deploy = int(os.popen("du -s app/airflow_deploy | cut -f1").read())
 list_folders = ["csv", "dags", "jar", "keys", "keytab", "scripts", "user_data"]
@@ -23,17 +38,6 @@ list_folders = ["csv", "dags", "jar", "keys", "keytab", "scripts", "user_data"]
 request_name = subprocess.Popen(
     "${SUDO_USER:-${USER}}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
 )
-
-#######
-# real_name = request_name.stderr.read().decode("utf-8").split("\n")[0].split(" ")[1].replace(":","")
-
-# Наследуем stdout и stderr от request_name
-proc = subprocess.Popen(
-    CMD,
-    stdout=request_name.stdout,
-    stderr=request_name.stderr,
-)
-# Чтение вывода из request_name
 stdout_output = request_name.stdout.read().decode("utf-8") if request_name.stdout else ""
 stderr_output = request_name.stderr.read().decode("utf-8") if request_name.stderr else ""
 
@@ -57,96 +61,48 @@ else:
 
 current_hostname = socket.gethostname()
 
-ARGV_KEYS = ["-c", "-h", "--file", "--dir", "--skipped"]
 
-# uid_airflow_deploy = pwd.getpwnam("airflow_deploy").pw_uid
-
-# uid_group_airflow = grp.getgrnam("airflow").gr_gid
-
-FOLDER_EXTENSION = dict()
-
-FOLDER_EXTENSION["/app/airflow_deploy/dags/"] = ["py", "json"]
-
-FOLDER_EXTENSION["/app/airflow_deploy/dags/sql/"] = ["sql"]
-
-FOLDER_EXTENSION["/app/airflow_deploy/csv/"] = ["csv"]
-
-FOLDER_EXTENSION["/app/airflow_deploy/jar/"] = ["jar"]
-
-FOLDER_EXTENSION["/app/airflow_deploy/keys/"] = ["pfx", "p12", "jks", "secret"]
-
-FOLDER_EXTENSION["/app/airflow_deploy/keytab/"] = ["keytab"]
-
-GLOBAL_LIST_ERROR = set()
-
-REMOVE_FILES_FOLDERS = set()
-
-result_queue = Queue()
-
-ALL_ERROR = Queue()
 
 
 # REMOVE DESTITINATION FOLDER
 def remove_destination_folder(hostname, result_queue):
-
     for elem in list_folders:
-
         if elem == "dags":
-
             result_command_dag = list(
                 os.popen(f"ssh airflow_deploy@{hostname} ls -a /app/airflow/{elem}/")
                 .read()
                 .split("\n")
             )
-
             result_command_dag.remove(".")
-
             result_command_dag.remove("..")
-
             result_command_dag.remove("")
-
             for elem_dags_dir in result_command_dag:
-
                 if "__pycache__" in elem_dags_dir:
-
                     continue
-
                 result_command_dag = os.popen(
                     f"ssh airflow_deploy@{hostname} rm -rfv /app/airflow/dags/{elem_dags_dir}"
                 ).read()
-
                 result_queue.put(result_command_dag)
-
             result_command_dag = os.popen(
                 f"ssh airflow_deploy@{hostname} rm -rfv /app/airflow/dags/sql/*"
             ).read()
-
             result_queue.put(result_command_dag)
-
         else:
-
             remote_list_files_folders = os.popen(
                 f"ssh airflow_deploy@{hostname} ls -R /app/airflow/{elem}/"
             ).read()
-
             result_command = list(
                 os.popen(f"ssh airflow_deploy@{hostname} ls -a /app/airflow/{elem}/")
                 .read()
                 .split("\n")
             )
-
             result_command.remove(".")
-
             result_command.remove("..")
-
             result_command.remove("")
-
             for elem_result_command in result_command:
-
                 result_command = os.popen(
                     f"ssh airflow_deploy@{hostname} rm -rf /app/airflow/{elem}/{elem_result_command}"
                 ).read()
-
                 result_queue.put(result_command)
 
 
@@ -1821,7 +1777,7 @@ def check_free_space(data_host, ALL_ERROR):
         ).read()
 
         free_disk_space = int(result_command.split(" ")[0])
-
+        print(f"[DEBUG] result_command: '{result_command}'")
         used = int(result_command.split(" ")[1])
 
         total = free_disk_space + used
@@ -1843,7 +1799,7 @@ def check_free_space(data_host, ALL_ERROR):
         ).read()
 
         free_disk_space = int(result_command.split(" ")[0])
-
+        print(f"[DEBUG] result_command: '{result_command}'")
         used = int(result_command.split(" ")[1])
 
         total = free_disk_space + used
