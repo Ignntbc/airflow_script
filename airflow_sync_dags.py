@@ -88,22 +88,11 @@ def remove_destination_folder(hostname, result_queue):
             ).read()
             result_queue.put(result_command_dag)
         else:
-            remote_list_files_folders = os.popen(
-                f"ssh airflow_deploy@{hostname} ls -R /app/airflow/{elem}/"
+            # Оптимизация: удаляем всё содержимое папки одной командой
+            result_command = os.popen(
+                f"ssh airflow_deploy@{hostname} rm -rf /app/airflow/{elem}/*"
             ).read()
-            result_command = list(
-                os.popen(f"ssh airflow_deploy@{hostname} ls -a /app/airflow/{elem}/")
-                .read()
-                .split("\n")
-            )
-            result_command.remove(".")
-            result_command.remove("..")
-            result_command.remove("")
-            for elem_result_command in result_command:
-                result_command = os.popen(
-                    f"ssh airflow_deploy@{hostname} rm -rf /app/airflow/{elem}/{elem_result_command}"
-                ).read()
-                result_queue.put(result_command)
+            result_queue.put(result_command)
 
 
 # PARAM RUN SCRIPT
