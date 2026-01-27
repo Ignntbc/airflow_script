@@ -1778,7 +1778,12 @@ def check_free_space(data_host, ALL_ERROR):
 
         free_disk_space = int(result_command.split(" ")[0])
         print(f"[DEBUG] result_command: '{result_command}'")
-        used = int(result_command.split(" ")[1])
+        parts = result_command.split()
+        if len(parts) < 2:
+            ALL_ERROR.put(f"Ошибка: некорректный вывод df: '{result_command}'\n")
+            return
+        used = int(parts[1])
+        # used = int(result_command.split(" ")[1])
 
         total = free_disk_space + used
 
@@ -1801,6 +1806,11 @@ def check_free_space(data_host, ALL_ERROR):
         free_disk_space = int(result_command.split(" ")[0])
         print(f"[DEBUG] result_command: '{result_command}'")
         used = int(result_command.split(" ")[1])
+        parts = result_command.split()
+        if len(parts) < 2:
+            ALL_ERROR.put(f"Ошибка: некорректный вывод df: '{result_command}'\n")
+            return
+        used = int(parts[1])
 
         total = free_disk_space + used
 
