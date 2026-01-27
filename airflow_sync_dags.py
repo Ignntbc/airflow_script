@@ -64,34 +64,47 @@ current_hostname = socket.gethostname()
 
 
 
-
-def remove_destination_folder(hostname: str,
-                            result_queue: Queue,
-                            path: str) -> None:
+# REMOVE DESTITINATION FOLDER
+def remove_destination_folder(hostname: str, result_queue: Queue) -> None:
     """
-    Remove all contents of the specified remote directory and then the directory itself via SSH.
-    Skips deletion of __pycache__ directories. Results of each operation are put into result_queue.
-
-    Args:
-        hostname (str): Target host to connect via SSH.
-        result_queue (Queue): Multiprocessing queue to collect command results.
-        path (str): path to the remote directory to clean and remove.
+    Удаляет содержимое целевых папок на удалённом сервере airflow_deploy через ssh.
+    
+    Параметры:
+        hostname (str): Имя или адрес удалённого хоста.
+        result_queue (Queue): Очередь для передачи результатов выполнения команд.
+    
+    Для папки dags пропускает каталоги __pycache__, для остальных удаляет все элементы.
     """
-    # List all items in the directory
-    list_command = f"ssh airflow_deploy@{hostname} ls -a {path}"
-    result = os.popen(list_command).read().split("\n")
-    # Remove . and .. and empty
-    result = [item for item in result if item not in (".", "..", "")]
-    for item in result:
-        if "__pycache__" in item:
-            continue
-        del_cmd = f"ssh airflow_deploy@{hostname} rm -rfv {os.path.join(path, item)}"
-        del_result = os.popen(del_cmd).read()
-        result_queue.put(del_result)
-    # Remove the directory itself
-    del_dir_cmd = f"ssh airflow_deploy@{hostname} rm -rfv {path}"
-    del_dir_result = os.popen(del_dir_cmd).read()
-    result_queue.put(del_dir_result)
+    for elem in list_folders:
+        if elem == "dags":
+            result_command_dag = list(
+                os.popen(f"ssh airflow_deploy@{hostname} ls -a /app/airflow/{elem}/")
+                .read()
+                .split("\n")
+            )
+            result_command_dag.remove(".")
+            result_command_dag.remove("..")
+            result_command_dag.remove("")
+            for elem_dags_dir in result_command_dag:
+                if "__pycache__" in elem_dags_dir:
+                    continue
+                result_command_dag = os.popen(
+                    f"ssh airflow_deploy@{hostname} rm -rfv /app/airflow/dags/{elem_dags_dir}"
+                ).read()
+                result_queue.put(result_command_dag)
+            result_command_dag = os.popen(
+                f"ssh airflow_deploy@{hostname} rm -rfv /app/airflow/dags/sql/*"
+            ).read()
+            result_queue.put(result_command_dag)
+        else:
+            # remote_list_files_folders = os.popen(f"ssh airflow_deploy@{hostname} ls -R /app/airflow/{elem}/").read()
+            result_command = list(os.popen(f"ssh airflow_deploy@{hostname} ls -a /app/airflow/{elem}/").read().split("\n"))
+            result_command.remove(".")
+            result_command.remove("..")
+            result_command.remove("")
+            for elem_result_command in result_command:
+                result_command = os.popen(f"ssh airflow_deploy@{hostname} rm -rf /app/airflow/{elem}/{elem_result_command}").read()
+                result_queue.put(result_command)
 
 
 # PARAM RUN SCRIPT
@@ -2102,10 +2115,11 @@ if configuration == "claster":
             sys.exit(1)
 
     if len(sys.argv) == 2 and sys.argv[1] == "-c":
-        paths = sys.argv[2:]
-        print(paths)
+
         for hostname in all_hosts:
-            remove_destination_folder(hostname, result_queue, paths)
+
+            remove_destination_folder(hostname, result_queue)
+
         REMOVE_FILES_FOLDERS = result_queue.get()
 
     for hostname in all_hosts:
