@@ -853,6 +853,7 @@ def check_rsync_host(host_name: str, all_error: Queue) -> None:
             chmod_string = CHMOD_FG_FU_FO_STRING
 
         command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}"
+        print(command)
         with subprocess.Popen(command,
                             shell=True,
                             stdout=subprocess.PIPE,
