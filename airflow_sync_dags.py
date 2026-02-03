@@ -47,7 +47,7 @@ ext_map = {
 }
 
 size_airflow_deploy = int(os.popen("du -s app/airflow_deploy | cut -f1").read())
-list_folders = ["csv", "dags", "jar", "keys", "keytab", "scripts", "user_data"]
+list_folders = ["dags"]#TODO вернуть все папки ,"csv", "jar", "keys", "keytab", "scripts", "user_data"
 
 LOCAL_TEST = True
 if LOCAL_TEST:
