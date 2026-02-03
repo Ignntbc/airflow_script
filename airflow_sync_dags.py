@@ -823,9 +823,9 @@ def rsync_host(host_name: str, path_sum: dict[str, str]) -> None:
     """
     for folder in list_folders:
         if folder in ("keytab", "keys"):
-            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_WITHOUT_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}: {AIRFLOW_PATH} 2> /dev/null").read()
+            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_WITHOUT_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH} 2> /dev/null").read()
         else:
-            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_FG_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}: {AIRFLOW_PATH} 2> /dev/null").read()
+            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_FG_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH} 2> /dev/null").read()
         
         for root, _, files in os.walk(f"{AIRFLOW_DEPLOY_PATH}{folder}"):
             for file in files:
@@ -833,9 +833,8 @@ def rsync_host(host_name: str, path_sum: dict[str, str]) -> None:
                     temp_file = f"{root}/{file}"
                     temp_file_airflow = f"{AIRFLOW_PATH}" + f"{root}/{file}"[20:]
                     md5_sum = path_sum[temp_file]
-                    log_file.write(
-                        f"  Source: {root}/{file}  Destination: {host_name}@{temp_file_airflow}  Md5hash: {md5_sum}\n\n"
-                    )
+                    log_file.write(f"  Source: {root}/{file}  Destination: {host_name}@{temp_file_airflow}  Md5hash: {md5_sum}\n\n"
+)
 
 
 def check_rsync_host(host_name: str, all_error: Queue) -> None:
@@ -853,7 +852,7 @@ def check_rsync_host(host_name: str, all_error: Queue) -> None:
         else:
             chmod_string = CHMOD_FG_FU_FO_STRING
 
-        command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}: {AIRFLOW_PATH}"
+        command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}"
         with subprocess.Popen(command,
                             shell=True,
                             stdout=subprocess.PIPE,
