@@ -626,7 +626,7 @@ def check_permission_type(
         error_msg (str): Сообщение об ошибке для добавления в очередь ALL_ERROR.
     """
     if check_type == "group":
-        cmd = f"{SSH_USER}@{host} find {folder} ! -group airflow_deploy ! -group airflow"
+        cmd = f"{SSH_USER}@{host} find {folder} ! -group airflow" #TODO вернуть проверку группы airflow_deploy ! -group airflow_deploy
     else:
         cmd = f"{SSH_USER}@{host} find {folder} ! -user airflow_deploy ! -user airflow"
     for_result = os.popen(cmd).read().split("\n")
@@ -648,7 +648,7 @@ def check_groups_users(host: str, all_error: Queue) -> None:
     for folder in list_folders:
         dir_path = f"{AIRFLOW_PATH}{folder}"
         if CONFIGURATION == "cluster":
-            find_group_cmd = f"{SSH_USER}@{host} find {dir_path} ! -group airflow_deploy ! -group airflow"
+            find_group_cmd = f"{SSH_USER}@{host} find {dir_path} ! -group airflow" #TODO вернуть проверку группы airflow_deploy ! -group airflow_deploy
             check_permission(find_group_cmd, "Ошибка !!! Некорректная группа на хосте", host, all_error)
             find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow_deploy ! -user airflow"
             check_permission(find_user_cmd, "Ошибка !!! Некорректный владелец на хосте", host, all_error)
