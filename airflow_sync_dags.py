@@ -304,7 +304,9 @@ def check_param_file_key(
         CHOWN_STRING, CHMOD_FG_FU_FO_STRING, CHMOD_WITHOUT_FU_FO_STRING, CHMOD_WITHOUT_DO_FU_DG_FO_STRING,
         RSYNC_CHECKSUM_DR_STRING, RSYNC_CHECKSUM_STRING, RSYNC_DRY_RUN, save_log
     """
+    print(f"DEBUG: check_param_file_key start {script_args}")
     for i_script_args in script_args:
+        print(f"DEBUG: Processing {i_script_args}")
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{i_script_args}"
         temp_folder_path = i_script_args.rpartition("/")[0]
 
@@ -827,6 +829,7 @@ def rsync_host(host_name: str, path_sum: dict[str, str]) -> None:
     Параметры:
         hostname (str): Имя или адрес хоста для синхронизации.
     """
+    print("DEBUG: rsync_host start ")
     for folder in list_folders:
         if folder in ("keytab", "keys"):
             os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_WITHOUT_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH} 2> /dev/null").read()
@@ -942,6 +945,7 @@ def main() -> None:
         param_run_script()
 
         if ALL_ERROR.qsize() > 0:
+            print("DEBUG: ALL_ERROR detected")
             data_all_error = [ALL_ERROR.get() for _ in range(ALL_ERROR.qsize())]
             with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as file_log:
                 current_datetime_now = datetime.now()
