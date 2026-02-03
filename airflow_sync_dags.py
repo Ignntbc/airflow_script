@@ -645,6 +645,7 @@ def check_groups_users(host: str, all_error: Queue) -> None:
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
     #TODO: Проверить check_permission 
+    print("DEBUG: check_groups_users start ")
     for folder in list_folders:
         dir_path = f"{AIRFLOW_PATH}{folder}"
         if CONFIGURATION == "cluster":
@@ -670,6 +671,7 @@ def check_permissions(host: str, all_error: Queue) -> None:
         host (str): Имя или адрес хоста, на котором выполняется проверка.
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
+    print("DEBUG: check_permissions start ")
     for folder in list_folders:
         dir_path = f"{AIRFLOW_PATH}{folder}"
         if CONFIGURATION == "cluster":
@@ -742,6 +744,7 @@ def connect_write(host: str, all_error: Queue) -> None:
         host (str): Имя или адрес хоста для проверки доступности.
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
+    print("DEBUG: connect_write start ")
     data_connect_write = subprocess.Popen(
         f"ping -c 1 {host} ", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
@@ -758,6 +761,7 @@ def check_free_space(data_host: str, all_error: Queue) -> None:
         data_host (str): Имя или адрес хоста для проверки.
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
+    print("DEBUG: check_free_space start ")
     result_command = os.popen(
         f"{SSH_USER}@{data_host} df /app  --output=avail,used | tail -n +2 | tr -d '%'"
     ).read()
@@ -846,6 +850,7 @@ def check_rsync_host(host_name: str, all_error: Queue) -> None:
         host_name (str): Имя или адрес хоста для проверки синхронизации.
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
+    print("DEBUG: check_rsync_host start ")
     for folder in list_folders:
         if folder in ("keytab", "keys"):
             chmod_string = CHMOD_WITHOUT_FU_FO_STRING
@@ -853,7 +858,6 @@ def check_rsync_host(host_name: str, all_error: Queue) -> None:
             chmod_string = CHMOD_FG_FU_FO_STRING
 
         command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}"
-        print(command)
         with subprocess.Popen(command,
                             shell=True,
                             stdout=subprocess.PIPE,
