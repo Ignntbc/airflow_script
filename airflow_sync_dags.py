@@ -170,6 +170,7 @@ def param_run_script() -> None:
         - имя пользователя,
         - параметр запуска (если передан -c, то отмечается, иначе пишется 'false key').
     """
+    print("DEBUG: param_run_script start ")
     with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as run_script:
         run_script.write(
             "******************************************* Run script *******************************************\n"
@@ -596,6 +597,7 @@ def check_files_in_dirs(all_error: Queue) -> None:
     Параметры:
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
+    print("DEBUG: check_files_in_dirs start ")
     files_in_dirs = 0
     for elem_list_folders in list_folders:
         for _, dirs, files in os.walk(f"{AIRFLOW_DEPLOY_PATH}{elem_list_folders}"):
