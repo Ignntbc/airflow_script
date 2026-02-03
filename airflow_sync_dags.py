@@ -832,9 +832,9 @@ def rsync_host(host_name: str, path_sum: dict[str, str]) -> None:
     print("DEBUG: rsync_host start ")
     for folder in list_folders:
         if folder in ("keytab", "keys"):
-            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_WITHOUT_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH} 2> /dev/null").read()
+            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_WITHOUT_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}").read()# 2> /dev/null
         else:
-            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_FG_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH} 2> /dev/null").read()
+            os.popen(f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_FG_FU_FO_STRING} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}").read() # 2> /dev/null
         
         for root, _, files in os.walk(f"{AIRFLOW_DEPLOY_PATH}{folder}"):
             for file in files:
