@@ -263,7 +263,10 @@ def check_param_delete_key(
     Использует глобальные переменные:
         real_name, CONFIGURATION, all_hosts, AIRFLOW_PATH, SSH_USER, save_log
     """
-    missing = [f" {AIRFLOW_PATH}{x}" for x in script_args if not os.path.exists(f" {AIRFLOW_PATH}{x}")]
+    print("DEBUG: check_param_delete_key start ")
+    print(f"DEBUG: script_args for delete: {script_args}")
+    missing = [f"{AIRFLOW_PATH}{x}" for x in script_args if not os.path.exists(f"{AIRFLOW_PATH}{x}")]
+    print(f"DEBUG: missing files/directories: {missing}")
     if missing:
         save_log(f"{current_datetime} {real_name} Нет такого файла или директории {', '.join(missing)}\n\n", with_exit=True)
 
@@ -890,6 +893,7 @@ def host_checks(hostname: str, all_error: Queue) -> None:
     check_groups_users(hostname, all_error)
     check_rsync_host(hostname, all_error)
 
+
 def main() -> None:
     """
     Основная функция скрипта, выполняющая синхронизацию директорий и проверку параметров.
@@ -940,7 +944,7 @@ def main() -> None:
             p.start()
         for p in processes:
             p.join()
-
+        remove_files_folders = check_param_run(ALL_ERROR)
         check_files_in_dirs(ALL_ERROR)
         param_run_script()
 
