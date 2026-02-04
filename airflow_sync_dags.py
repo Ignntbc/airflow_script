@@ -324,60 +324,59 @@ def check_param_file_key(
         RSYNC_CHECKSUM_DR_STRING, RSYNC_CHECKSUM_STRING, RSYNC_DRY_RUN, save_log
     """
     print(f"DEBUG: check_param_file_key start {script_args}")
-    try:
-        for i_script_args in script_args:
-            print(f"DEBUG: Processing {i_script_args}")
-            airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{i_script_args}"
-            temp_folder_path = i_script_args.rpartition("/")[0]
+    # try:
+    for i_script_args in script_args:
+        print(f"DEBUG: Processing {i_script_args}")
+        airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{i_script_args}"
+        temp_folder_path = i_script_args.rpartition("/")[0]
 
-            if not os.path.exists(airflow_deploy_dir_path):
-                save_log(f"{current_datetime} {real_name} Файл не найден {airflow_deploy_dir_path} !\n\n", with_exit=True)
+        if not os.path.exists(airflow_deploy_dir_path):
+            save_log(f"{current_datetime} {real_name} Файл не найден {airflow_deploy_dir_path} !\n\n", with_exit=True)
 
-            if i_script_args.startswith("keytab") or i_script_args.startswith("keys"):
-                if i_script_args.count("/") > 1:
-                    CHMOD_STRING = CHMOD_WITHOUT_DO_FU_DG_FO_STRING
-                else:
-                    CHMOD_STRING = CHMOD_WITHOUT_FU_FO_STRING
+        if i_script_args.startswith("keytab") or i_script_args.startswith("keys"):
+            if i_script_args.count("/") > 1:
+                CHMOD_STRING = CHMOD_WITHOUT_DO_FU_DG_FO_STRING
             else:
-                CHMOD_STRING = CHMOD_FG_FU_FO_STRING
+                CHMOD_STRING = CHMOD_WITHOUT_FU_FO_STRING
+        else:
+            CHMOD_STRING = CHMOD_FG_FU_FO_STRING
 
-            if CONFIGURATION == "one-way":
-                hosts = ["127.0.0.1"]
+        if CONFIGURATION == "one-way":
+            hosts = ["127.0.0.1"]
+        else:
+            hosts = all_hosts + ['127.0.0.1']
+
+        for host in hosts:
+            host_prefix = f"airflow_deploy@{host}:"
+            if i_script_args.count("/") > 1:
+                run_command_with_log(
+                    f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
+                    with_exit=True,
+                    rsync_error=True
+                )
+                run_command_with_log(
+                    f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
+                )
             else:
-                hosts = all_hosts + ['127.0.0.1']
-            host_prefix = "airflow_deploy@{host}:"
+                run_command_with_log(
+                    f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
+                    with_exit=True,
+                    rsync_error=True
+                )
+                run_command_with_log(
+                    f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
+                )
+    print("0")
+    sys.exit(0)
 
-            for host in hosts:
-                host_prefix = f"airflow_deploy@{host}:"
-                if i_script_args.count("/") > 1:
-                    run_command_with_log(
-                        f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
-                        f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                        with_exit=True,
-                        rsync_error=True
-                    )
-                    run_command_with_log(
-                        f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
-                        f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                    )
-                else:
-                    run_command_with_log(
-                        f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
-                        f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                        with_exit=True,
-                        rsync_error=True
-                    )
-                    run_command_with_log(
-                        f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
-                        f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                    )
-        print("0")
-        sys.exit(0)
-
-    except Exception as e:
-        save_log(f"{current_datetime} {real_name} Ошибка при деплое файла: {str(e)}\n\n", with_exit=True)
-        print(1)
-        sys.exit(1)
+    # except Exception as e:
+    #     save_log(f"{current_datetime} {real_name} Ошибка при деплое файла: {str(e)}\n\n", with_exit=True)
+    #     print(1)
+    #     sys.exit(1)
 
 def check_param_c_key(remove_files_folders: set,
                     all_error:Queue) -> set:
