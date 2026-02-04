@@ -295,7 +295,7 @@ def check_param_delete_key(
                     save_log(f"{current_datetime} {real_name} Delete directory: {path}\n\n")
 
             else:
-                all_hosts_and_local += ['127.0.0.1']
+                all_hosts_and_local = all_hosts + ['127.0.0.1']
                 for host in all_hosts_and_local:
                     os.popen(f"{SSH_USER}@{host} rm -rf {path}").read()
                     save_log(f"{current_datetime} {real_name} {host}  Delete file: {path}\n\n")
