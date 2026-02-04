@@ -328,7 +328,9 @@ def check_param_file_key(
     for i_script_args in script_args:
         print(f"DEBUG: Processing {i_script_args}")
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{i_script_args}"
+        print(f"DEBUG: airflow_deploy_dir_path: {airflow_deploy_dir_path}")
         temp_folder_path = i_script_args.rpartition("/")[0]
+        print(f"DEBUG: temp_folder_path: {temp_folder_path}")
 
         if not os.path.exists(airflow_deploy_dir_path):
             save_log(f"{current_datetime} {real_name} Файл не найден {airflow_deploy_dir_path} !\n\n", with_exit=True)
@@ -348,6 +350,8 @@ def check_param_file_key(
 
         for host in hosts:
             host_prefix = f"airflow_deploy@{host}:"
+            print(f"DEBUG: host_prefix: {host_prefix}")
+
             if i_script_args.count("/") > 1:
                 run_command_with_log(
                     f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
