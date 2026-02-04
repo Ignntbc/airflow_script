@@ -26,6 +26,7 @@ END_ALL_ERRORS_STRING = "\n******************************************* END ALL E
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogp --rsync-path="mkdir -p'
 RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogp --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogp'
+RSYNC_CHECKSUM = "rsync --checksum -rogp" 
 CHOWN_STRING = "--chown=airflow_deploy:airflow"
 CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
 AIRFLOW_PATH = "/app/airflow/"
@@ -370,9 +371,9 @@ def check_param_file_key(
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
                     rsync_error=True
                 )
-                print(f"DEBUG: {RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}")
+
                 run_command_with_log(
-                    f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
+                    f"{RSYNC_CHECKSUM} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
                 )
     print("0")
