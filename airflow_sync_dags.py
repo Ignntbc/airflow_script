@@ -348,27 +348,27 @@ def check_param_file_key(
             host_prefix = "airflow_deploy@{host}:"
 
             for host in hosts:
-                prefix = host_prefix.format(host=host)
+                host_prefix = f"airflow_deploy@{host}:"
                 if i_script_args.count("/") > 1:
                     run_command_with_log(
-                        f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {prefix}{AIRFLOW_PATH}{i_script_args}',
+                        f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
                         with_exit=True,
                         rsync_error=True
                     )
                     run_command_with_log(
-                        f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {prefix}{AIRFLOW_PATH}{i_script_args}',
+                        f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
                     )
                 else:
                     run_command_with_log(
-                        f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {prefix}{AIRFLOW_PATH}{i_script_args}",
+                        f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
                         with_exit=True,
                         rsync_error=True
                     )
                     run_command_with_log(
-                        f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {prefix}{AIRFLOW_PATH}{i_script_args}",
+                        f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
                     )
         print("0")
