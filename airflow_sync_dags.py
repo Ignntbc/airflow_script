@@ -190,7 +190,6 @@ def param_run_script() -> None:
 def run_command_with_log(
     command: str,
     log_message: str,
-    with_exit: bool = False,
     rsync_error: bool = False
 ) -> str:
     """
@@ -205,7 +204,9 @@ def run_command_with_log(
     :return: Результат выполнения команды.
     """
     result = os.popen(command).read()
+    with_exit = False
     if rsync_error and "rsync error" in result:
+        with_exit = True
         save_log(f"{log_message}{result}\n\n", with_exit=with_exit)
     else:
         save_log(log_message, with_exit=with_exit)
@@ -356,7 +357,6 @@ def check_param_file_key(
                 run_command_with_log(
                     f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                    with_exit=True,
                     rsync_error=True
                 )
                 run_command_with_log(
@@ -368,7 +368,6 @@ def check_param_file_key(
                 run_command_with_log(
                     f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                    with_exit=True,
                     rsync_error=True
                 )
                 print(f"DEBUG: {RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}")
@@ -553,7 +552,6 @@ def check_param_dir_key(
                     run_command_with_log(
                         f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/  {host_prefix.format(host=host)}{AIRFLOW_PATH}{i_script_args}',
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                        with_exit=True,
                         rsync_error=True
                     )
                     run_command_with_log(
@@ -564,7 +562,6 @@ def check_param_dir_key(
                     run_command_with_log(
                         f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/  {host_prefix.format(host=host)}{AIRFLOW_PATH}{i_script_args}",
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{i_script_args}\n\n",
-                        with_exit=True,
                         rsync_error=True
                     )
                     run_command_with_log(
