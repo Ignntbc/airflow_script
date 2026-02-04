@@ -371,7 +371,6 @@ def check_param_file_key(
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
                     rsync_error=True
                 )
-
                 run_command_with_log(
                     f"{RSYNC_CHECKSUM} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлен файл:  {AIRFLOW_PATH}{i_script_args}\n\n",
@@ -533,6 +532,7 @@ def check_param_dir_key(
     Не возвращает значения. В случае ошибки завершает выполнение скрипта.
     """
     try:
+        print(f"DEBUG: check_param_dir_key start {script_args}")
         for i_script_args in script_args:
             temp_folder_path = i_script_args.rpartition("/")[0]
             airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{i_script_args}"
@@ -565,8 +565,9 @@ def check_param_dir_key(
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{i_script_args}\n\n",
                         rsync_error=True
                     )
+                    # f'rsync --checksum -rogp --chown=airflow_deploy:airflow --chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx /app/airflow_deploy/{i_script_args}/ airflow_deploy@127.0.0.1:/app/airflow/{i_script_args}').read()
                     run_command_with_log(
-                        f"{RSYNC_CHECKSUM_STRING} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/  {host_prefix.format(host=host)}{AIRFLOW_PATH}{i_script_args}",
+                        f"{RSYNC_CHECKSUM} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{i_script_args}",
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{i_script_args}\n\n",
                     )
 
