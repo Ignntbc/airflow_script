@@ -334,37 +334,40 @@ def check_param_delete_key(
     Использует глобальные переменные:
         real_name, CONFIGURATION, all_hosts, AIRFLOW_PATH, SSH_USER, save_log
     """
-    print("DEBUG: check_param_delete_key start ")
+    logger.info("Запуск удаления файлов/директорий по ключу --delete: %s", script_args)
     try:
         missing = [f"{AIRFLOW_PATH}{x}" for x in script_args if not os.path.exists(f"{AIRFLOW_PATH}{x}")]
-        print(f"DEBUG: missing files/directories: {missing}")
         if missing:
             save_log(f"{current_datetime} {real_name} Нет такого файла или директории {', '.join(missing)}\n\n", with_exit=True)
 
         for i_script_args in script_args:
             path = f"{AIRFLOW_PATH}{i_script_args}"
             if CONFIGURATION == "one-way":
-                if os.path.isfile(path):
-                    os.remove(path)
-                    save_log(f"{current_datetime} {real_name} Delete file: {path}\n\n")
-                elif os.path.isdir(path):
-                    shutil.rmtree(path)
-                    save_log(f"{current_datetime} {real_name} Delete directory: {path}\n\n")
-
+                try:
+                    if os.path.isfile(path):
+                        os.remove(path)
+                        logger.info("Удалён файл: %s", path)
+                    elif os.path.isdir(path):
+                        shutil.rmtree(path)
+                        logger.info("Удалена директория: %s", path)
+                except Exception as e:
+                    logger.error("Ошибка при удалении %s: %s", path, str(e))
+                    save_log(f"{current_datetime} {real_name} Ошибка при удалении {path}: {str(e)}\n\n", with_exit=True)
             else:
                 all_hosts_and_local = all_hosts + ['127.0.0.1']
                 for host in all_hosts_and_local:
                     try:
-                        os.popen(f"{SSH_USER}@{host} rm -rf {path}").read()
-                        run_command_with_log(f"{SSH_USER}@{host} rm -rf {path}", f"Удаление файла: {path} на хосте {host}")
-                        save_log(f"{current_datetime} {real_name} {host}  Удален файл {path} на хосте {host}\n\n")
+                        run_command_with_log(f"{SSH_USER}@{host} rm -rf {path}", f"Удаление файла/директории: {path} на хосте {host}")
+                        logger.info("Удалён файл/директория: %s на хосте %s", path, host)
                     except Exception as e:
-                        save_log(f"{current_datetime} {real_name} Ошибка при удалении файла {path} на хосте {host}: {str(e)}\n\n", with_exit=True)
+                        logger.error("Ошибка при удалении %s на хосте %s: %s", path, host, str(e))
+                        save_log(f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}\n\n", with_exit=True)
+        logger.info("Удаление файлов/директорий завершено успешно")
         print("0")
         sys.exit(0)
     except Exception as e:
-        save_log(f"{current_datetime} {real_name} Ошибка при удалении: {str(e)}\n\n", with_exit=True)
-        print(1)
+        logger.error("Ошибка при удалении: %s", str(e))
+        print("1")
         sys.exit(1)
 
 
@@ -384,7 +387,7 @@ def check_param_file_key(
         CHOWN_STRING, CHMOD_FG_FU_FO_STRING, CHMOD_WITHOUT_FU_FO_STRING, CHMOD_WITHOUT_DO_FU_DG_FO_STRING,
         RSYNC_CHECKSUM_DR_STRING, RSYNC_CHECKSUM_STRING, RSYNC_DRY_RUN, save_log
     """
-    logger.debug("Запуск деплоя файлов: %s", script_args)
+    logger.info("Запуск деплоя файлов: %s", script_args)
     try:
         for i_script_args in script_args:
             airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{i_script_args}"
@@ -393,7 +396,8 @@ def check_param_file_key(
             logger.debug("Проверка наличия файла для деплоя: %s", airflow_deploy_dir_path)
             if not os.path.exists(airflow_deploy_dir_path):
                 logger.error("Файл не найден для деплоя: %s", airflow_deploy_dir_path)
-                save_log(f"{current_datetime} {real_name} Файл не найден {airflow_deploy_dir_path} !\n\n", with_exit=True)
+                print("1")
+                sys.exit(1)
 
             if i_script_args.startswith("keytab") or i_script_args.startswith("keys"):
                 if i_script_args.count("/") > 1:
@@ -410,37 +414,38 @@ def check_param_file_key(
 
             for host in hosts:
                 host_prefix = f"airflow_deploy@{host}:"
-                logger.debug("Запуск rsync для деплоя файла: %s на хосте %s", airflow_deploy_dir_path, host)
+                logger.info("Запуск rsync для деплоя файла: %s на хосте %s", airflow_deploy_dir_path, host)
                 try:
                     if i_script_args.count("/") > 1:
                         run_command_with_log(
                             f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
-                            f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Запуск dry-run rsync для файла:  {AIRFLOW_PATH}{i_script_args}",
+                            f"Dry-run rsync для файла:  {AIRFLOW_PATH}{i_script_args} на хосте {host}",
                             rsync_error=True
                         )
                         logger.debug("Dry-run rsync завершён для файла: %s на хосте %s", airflow_deploy_dir_path, host)
                         run_command_with_log(
                             f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}',
-                            f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Деплой файла:  {AIRFLOW_PATH}{i_script_args}",
+                            f"Деплой файла:  {AIRFLOW_PATH}{i_script_args} на хосте {host}",
                         )
                         logger.info("Файл успешно скопирован: %s на хосте %s", airflow_deploy_dir_path, host)
                     else:
                         logger.debug("Dry-run rsync: %s", f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}")
                         run_command_with_log(
                             f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
-                            f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Запуск dry-run rsync для файла:  {AIRFLOW_PATH}{i_script_args}",
+                            f"Dry-run rsync для файла:  {AIRFLOW_PATH}{i_script_args} на хосте {host}",
                             rsync_error=True
                         )
                         logger.debug("Dry-run rsync завершён для файла: %s на хосте %s", airflow_deploy_dir_path, host)
                         run_command_with_log(
                             f"{RSYNC_CHECKSUM} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{i_script_args}",
-                            f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Деплой файла:  {AIRFLOW_PATH}{i_script_args}",
+                            f"Деплой файла:  {AIRFLOW_PATH}{i_script_args} на хосте {host}",
                         )
                         logger.info("Файл успешно скопирован: %s на хосте %s", airflow_deploy_dir_path, host)
                 except Exception as e:
                     logger.error("Ошибка копирования файла %s на хост %s: %s", airflow_deploy_dir_path, host, str(e))
-                    save_log(f"{current_datetime} {real_name} Ошибка при деплое файла {airflow_deploy_dir_path} на хосте {host}: {str(e)}\n\n", with_exit=True)
-        logger.debug("Результат деплоя файлов: успешно")
+                    print("1")
+                    sys.exit(1)
+        logger.info("Результат деплоя файлов: успешно")
         print("0")
         sys.exit(0)
 
@@ -703,7 +708,7 @@ def check_param_dir_key(
         sys.exit(1)
 
 
-def check_param_run(all_error: Queue) -> set:
+def check_param_run() -> set:
     """
     Обрабатывает параметры командной строки для управления синхронизацией и удалением файлов/директорий Airflow.
 
@@ -719,7 +724,6 @@ def check_param_run(all_error: Queue) -> set:
     В случае неизвестного ключа — пишет ошибку в лог и завершает выполнение.
     """
     try:
-        remove_files_folders = set()
         current_datetime = datetime.now()
         script_args = sys.argv[2:]
         if len(sys.argv) >= 2:
@@ -740,17 +744,16 @@ def check_param_run(all_error: Queue) -> set:
             and sys.argv[1] not in ["--delete", "--file", "--dir", "-c", "-h"]
             and sys.argv[1] not in ARGV_KEYS
         ):
-            save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {sys.argv[1:]}\n\n")
-        
-        return remove_files_folders
+            save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {sys.argv[1:]}\n\n", with_exit=True)
+            print(1)
+            sys.exit(1)
     
     except Exception as e:
         save_log(f"{current_datetime} {real_name} Ошибка при обработке параметров: {str(e)}\n\n", with_exit=True)
-        print(1)
-        sys.exit(1)
 
 
-def check_files_in_dirs(all_error: Queue) -> None:
+
+def check_files_in_dirs() -> None:
     """
     Проверяет наличие файлов и директорий для переноса в  {AIRFLOW_DEPLOY_PATH}*.
     Если данных нет — добавляет ошибку в очередь all_error.
@@ -758,8 +761,8 @@ def check_files_in_dirs(all_error: Queue) -> None:
     Параметры:
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
+    logger.info("Запуск проверки наличия файлов и директорий для переноса в %s", AIRFLOW_DEPLOY_PATH)
     try:
-        print("DEBUG: check_files_in_dirs start ")
         files_in_dirs = 0
         for elem_list_folders in list_folders:
             for _, dirs, files in os.walk(f"{AIRFLOW_DEPLOY_PATH}{elem_list_folders}"):
@@ -769,14 +772,12 @@ def check_files_in_dirs(all_error: Queue) -> None:
                     break
 
         if files_in_dirs <= 1:
-            all_error.put(
-                "Ошибка !!! В прикладных директориях /app/airflow_deploy (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса\n\n"
-            )
-    
+            save_log(f"{datetime.now()} {real_name} Ошибка !!! В прикладных директориях /app/airflow_deploy (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса\n\n", with_exit=True)
+        else:
+            logger.info("Проверка наличия файлов для переноса завершена успешно. Найдено файлов/директорий: %d", files_in_dirs)
     except Exception as e:
-        all_error.put(f"Ошибка при проверке наличия файлов в директориях: {str(e)}\n\n")
-        print(1)
-        sys.exit(1)
+        save_log(f"{datetime.now()} {real_name} Ошибка при проверке наличия файлов в директориях: {str(e)}\n\n", with_exit=True)
+
 
 def check_permission_type(
     host: str,
@@ -912,7 +913,7 @@ def connect_write(host: str, all_error: Queue) -> None:
         all_error.put(f"Ошибка !!! Проверьте доступ к хосту {host} \n")
 
 
-def check_free_space(data_host: str, all_error: Queue) -> None:
+def check_free_space(data_host: str) -> None:
     """
     Проверяет свободное место на разделе /app удалённого хоста и предупреждает,
     если после деплоя занятое место превысит критический порог.
@@ -921,25 +922,33 @@ def check_free_space(data_host: str, all_error: Queue) -> None:
         data_host (str): Имя или адрес хоста для проверки.
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
-    print("DEBUG: check_free_space start ")
-    result_command = os.popen(
-        f"{SSH_USER}@{data_host} df /app  --output=avail,used | tail -n +2 | tr -d '%'"
-    ).read()
-    free_disk_space = int(result_command.split(" ")[0])
-    parts = result_command.split()
-    if len(parts) < 2:
-        all_error.put(f"Ошибка: некорректный вывод df: '{result_command}'\n")
-        return
+    logger.info("Запуск проверки свободного места на разделе /app хоста: %s", data_host)
+    try:
+        result_command = run_command_with_log(
+            f"{SSH_USER}@{data_host} df /app  --output=avail,used | tail -n +2 | tr -d '%'",
+            f"Проверка свободного места на /app хоста {data_host}"
+        )
+        logger.debug("Результат команды df: '%s'", result_command)
+        parts = result_command.split()
+        if len(parts) < 2:
+            logger.error("Ошибка: некорректный вывод df: '%s'", result_command)
+            return
 
-    used = int(parts[1])
-    total = free_disk_space + used
-    one_percent = total / 100
-    used_percent = int((used + size_airflow_deploy) / one_percent)
-    if used_percent > CRITICAL_PERCENT:
-        if CONFIGURATION == "cluster":
-            all_error.put(f"Предупреждение !!! После добавления файлов на хост {data_host} колличество занятого места превысит 80% в каталоге /app \n\n")
-        else:
-            all_error.put("Предупреждение !!! После добавления файлов на локальный хост колличество занятого места превысит 80% в каталоге /app \n\n")
+        free_disk_space = int(parts[0])
+        used = int(parts[1])
+        total = free_disk_space + used
+        one_percent = total / 100
+        used_percent = int((used + size_airflow_deploy) / one_percent)
+        logger.info("Свободно: %d, Использовано: %d, Всего: %d, %% после деплоя: %d", free_disk_space, used, total, used_percent)
+        if used_percent > CRITICAL_PERCENT:
+            warning_msg = ""
+            if CONFIGURATION == "cluster":
+                warning_msg = f"Предупреждение !!! После добавления файлов на хост {data_host} колличество занятого места превысит 80% в каталоге /app"
+            else:
+                warning_msg = "Предупреждение !!! После добавления файлов на локальный хост колличество занятого места превысит 80% в каталоге /app"
+            logger.warning(warning_msg)
+    except Exception as e:
+        logger.error("Ошибка при проверке свободного места на хосте %s: %s", data_host, str(e))
 
 def md5(fname: str) -> str:
     """
@@ -1044,7 +1053,7 @@ def host_checks(hostname: str, all_error: Queue) -> None:
         all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
     connect_write(hostname, all_error)
-    check_free_space(hostname, all_error)
+    check_free_space(hostname)
     check_permissions(hostname, all_error)
     check_groups_users(hostname, all_error)
     check_rsync_host(hostname)
@@ -1059,37 +1068,39 @@ def main() -> None:
         check_type_file(check_folder, check_extension, ALL_ERROR)
 
     path_sum = path_sum_files()
-    remove_files_folders = set()
 
     if CONFIGURATION == "one-way":
-        remove_files_folders = check_param_run(ALL_ERROR)
-        check_free_space(current_hostname, ALL_ERROR)
-        check_permissions(current_hostname, ALL_ERROR)
-        check_groups_users(current_hostname, ALL_ERROR)
-        check_rsync_host(current_hostname)
-        check_files_in_dirs(ALL_ERROR)
+        host_checks(current_hostname, ALL_ERROR)
+        check_param_run()
+        check_files_in_dirs()
         param_run_script()
-
-        if ALL_ERROR.qsize() > 0:
-            data_all_error = set(ALL_ERROR.get() for _ in range(ALL_ERROR.qsize()))
-            with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as file_log:
-                current_datetime_now = datetime.now()
-                file_log.write(f"******************************************* ALL ERORRS {current_datetime_now}*******************************************\n\n")
-                for one_data_all_error in data_all_error:
-                    file_log.write(one_data_all_error)
-                file_log.write(END_ALL_ERRORS_STRING)
-
-            print("1")
-            sys.exit(1)
-
         rsync_host(current_hostname, path_sum)
+        # check_free_space(current_hostname)
+        # check_permissions(current_hostname, ALL_ERROR)
+        # check_groups_users(current_hostname, ALL_ERROR)
+        # check_rsync_host(current_hostname)
+        
 
-        with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as end_work_script:
-            for remove_file in remove_files_folders:
-                end_work_script.write(f"{remove_file}\n")
+        # if ALL_ERROR.qsize() > 0:
+        #     data_all_error = set(ALL_ERROR.get() for _ in range(ALL_ERROR.qsize()))
+        #     with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as file_log:
+        #         current_datetime_now = datetime.now()
+        #         file_log.write(f"******************************************* ALL ERORRS {current_datetime_now}*******************************************\n\n")
+        #         for one_data_all_error in data_all_error:
+        #             file_log.write(one_data_all_error)
+        #         file_log.write(END_ALL_ERRORS_STRING)
 
-        with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as file_log:
-            file_log.write(END_WORK_SCRIPT_STRING)
+        #     print("1")
+        #     sys.exit(1)
+
+        
+
+        # with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as end_work_script:
+        #     for remove_file in remove_files_folders:
+        #         end_work_script.write(f"{remove_file}\n")
+
+        # with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as file_log:
+        #     file_log.write(END_WORK_SCRIPT_STRING)
 
         print("0")
         sys.exit(0)
@@ -1100,48 +1111,49 @@ def main() -> None:
             p.start()
         for p in processes:
             p.join()
-        remove_files_folders = check_param_run(ALL_ERROR)
-        check_files_in_dirs(ALL_ERROR)
+        check_param_run()
+        check_files_in_dirs()
         param_run_script()
+        for hostname in all_hosts:
+            rsync_host(hostname, path_sum)
 
-        if ALL_ERROR.qsize() > 0:
-            print("DEBUG: ALL_ERROR detected")
-            data_all_error = [ALL_ERROR.get() for _ in range(ALL_ERROR.qsize())]
-            with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as file_log:
-                current_datetime_now = datetime.now()
-                file_log.write(f"******************************************* ALL ERORRS {current_datetime_now}*******************************************\n\n")
-                for one_data_all_error in data_all_error:
-                    file_log.write(one_data_all_error)
-                file_log.write(END_ALL_ERRORS_STRING)
+        # if ALL_ERROR.qsize() > 0:
+        #     print("DEBUG: ALL_ERROR detected")
+        #     data_all_error = [ALL_ERROR.get() for _ in range(ALL_ERROR.qsize())]
+        #     with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as file_log:
+        #         current_datetime_now = datetime.now()
+        #         file_log.write(f"******************************************* ALL ERORRS {current_datetime_now}*******************************************\n\n")
+        #         for one_data_all_error in data_all_error:
+        #             file_log.write(one_data_all_error)
+        #         file_log.write(END_ALL_ERRORS_STRING)
 
-                print("1")
-                sys.exit(1)
+        #         print("1")
+        #         sys.exit(1)
 
         # if len(sys.argv) == 2 and sys.argv[1] == "-c":
         #     for hostname in all_hosts:
         #         remove_destination_folders(hostname, result_queue)
         #     remove_files_folders = result_queue.get()
 
-        for hostname in all_hosts:
-            rsync_host(hostname, path_sum)
+        
 
-        with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as end_work_script:
-            if len(sys.argv) == 2 and sys.argv[1] == "-c":
-                if f"removed directory '{AIRFLOW_PATH}dags/sql'\n" in remove_files_folders:
-                    remove_files_folders.remove(f"removed directory '{AIRFLOW_PATH}dags/sql'\n")
+        # with open(f"{AIRFLOW_DEPLOY_PATH}log/deploy.log", "a", encoding="utf-8") as end_work_script:
+        #     if len(sys.argv) == 2 and sys.argv[1] == "-c":
+        #         if f"removed directory '{AIRFLOW_PATH}dags/sql'\n" in remove_files_folders:
+        #             remove_files_folders.remove(f"removed directory '{AIRFLOW_PATH}dags/sql'\n")
 
-                end_work_script.write("Удаленные файлы: \n\n")
-                for remove_file in remove_files_folders:
-                    if (remove_file == f"removed directory '{AIRFLOW_PATH}dags/sql'\n"):
-                        continue
+            #     end_work_script.write("Удаленные файлы: \n\n")
+            #     for remove_file in remove_files_folders:
+            #         if (remove_file == f"removed directory '{AIRFLOW_PATH}dags/sql'\n"):
+            #             continue
 
-                    end_work_script.write(f"{remove_file}\n")
-                end_work_script.write("\n")
+            #         end_work_script.write(f"{remove_file}\n")
+            #     end_work_script.write("\n")
 
-            end_work_script.write(END_WORK_SCRIPT_STRING)
+            # end_work_script.write(END_WORK_SCRIPT_STRING)
 
-            print("0")
-            sys.exit(0)
+        print("0")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
