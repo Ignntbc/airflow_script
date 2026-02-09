@@ -1182,7 +1182,7 @@ def parse_args(script_args: list[str]) -> bool:
     paths = []
     for arg in script_args[1:]:
         if arg.startswith('-'):
-            keys.append(arg.replace("-", ""))
+            keys.append(arg)
         else:
             paths.append(arg)
 
@@ -1198,6 +1198,7 @@ def main() -> None:
         check_type_file(check_folder, check_extension)
 
     paths, keys = parse_args(sys.argv)
+    keys =[key.replace("-", "") for key in keys]
     key_allowed = is_key_combination_allowed(keys)
 
     if not key_allowed:
