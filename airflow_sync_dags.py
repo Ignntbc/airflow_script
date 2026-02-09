@@ -18,15 +18,15 @@ CMD = ["id"]
 ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v"]
 
 KEY_MATRIX = {
-    frozenset(['v', 'delete']): True,
-    frozenset(['v', 'file']): True,
-    frozenset(['v', 'dir']): True,
-    frozenset(['v', 'c']): True,
-    frozenset(['v', 'dry-run']): True,
-    frozenset(['dry-run', 'delete']): True,
-    frozenset(['dry-run', 'dir']): True,
-    frozenset(['dry-run', 'file']): True,
-    frozenset(['dry-run', 'c']): True,
+    frozenset(['-v', '--delete']): True,
+    frozenset(['-v', '--file']): True,
+    frozenset(['-v', '--dir']): True,
+    frozenset(['-v', '-c']): True,
+    frozenset(['-v', '--dry-run']): True,
+    frozenset(['--dry-run', '--delete']): True,
+    frozenset(['--dry-run', '--dir']): True,
+    frozenset(['--dry-run', '--file']): True,
+    frozenset(['--dry-run', '-c']): True,
     # Остальные сочетания считаются запрещёнными по умолчанию
 }
 
@@ -1198,7 +1198,6 @@ def main() -> None:
         check_type_file(check_folder, check_extension)
 
     paths, keys = parse_args(sys.argv)
-    keys =[key.replace("-", "") for key in keys]
     key_allowed = is_key_combination_allowed(keys)
 
     if not key_allowed:
