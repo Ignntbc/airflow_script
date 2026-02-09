@@ -1212,11 +1212,12 @@ def main() -> None:
 
 
     if CONFIGURATION == "cluster":
-        processes = [Process(target=host_checks, args=(hostname,)) for hostname in all_hosts]
-        for p in processes:
-            p.start()
-        for p in processes:
-            p.join()
+        # processes = [Process(target=host_checks, args=(hostname,)) for hostname in all_hosts]
+        # for p in processes:
+        #     p.start()
+        # for p in processes:
+        #     p.join()
+        check = [host_checks(hostname) for hostname in all_hosts]
         hosts = all_hosts
 
     check_files_in_dirs()
