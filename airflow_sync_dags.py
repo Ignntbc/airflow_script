@@ -818,7 +818,7 @@ def check_permission_type(
         if folder_name in ("keys", "keytab"):
             perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0060"
         else:
-            perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0775 ! -perm 0755"
+            perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0755"
         
         perm_error_prefix = f"Ошибка !!! Некорректные права для {folder} на хосте"
 
@@ -826,6 +826,7 @@ def check_permission_type(
         perm_result = os.popen(perm_cmd).read().split("\n")
         for item in perm_result:
             if len(item) > 2:
+                print(perm_result)
                 perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {item}", f"Ошибка при проверке прав на хосте {host} для {item}")
                 save_log(f"{perm_error_prefix} {item} {perm_error.strip()}", with_exit=True)
     
