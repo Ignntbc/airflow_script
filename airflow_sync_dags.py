@@ -391,7 +391,9 @@ def check_param_delete_key(
                         save_log(f"Ошибка при удалении {path} на хосте {host}: {str(e)}", with_exit=True)
                         save_log(f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}\n\n", with_exit=True)
         save_log("Удаление файлов/директорий завершено успешно", info_level=True)
-
+        print(0)
+        sys.exit(0)
+        
     except Exception as e:
         save_log(f"Ошибка при удалении: {str(e)}", with_exit=True)
 
@@ -557,6 +559,10 @@ def remove_destination_folders() -> None:
                 remote_delete_items(elem, host_name)
         
         save_log("Очистка целевых папок на удалённых хостах завершена успешно", info_level=True)
+    
+        print(0)
+        sys.exit(0)
+
     except Exception as e:
         save_log(f"Ошибка при очистке целевых папок: {str(e)}", with_exit=True)
 
