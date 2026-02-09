@@ -1182,7 +1182,7 @@ def parse_args(script_args: list[str]) -> bool:
     paths = []
     for arg in script_args[1:]:
         if arg.startswith('-'):
-            keys.append(arg)
+            keys.append(arg.replace("-", ""))
         else:
             paths.append(arg)
 
