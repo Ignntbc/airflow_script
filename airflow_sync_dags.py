@@ -230,7 +230,7 @@ def param_run_script(keys: list[str]) -> None:
         if key not in ALL_KEYS:
             save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {keys}\n\n", with_exit=True)
         if key == "-h":
-            check_param_f_key()
+            check_param_h_key()
             sys.exit(0)
            
 
@@ -391,8 +391,6 @@ def check_param_delete_key(
                         save_log(f"Ошибка при удалении {path} на хосте {host}: {str(e)}", with_exit=True)
                         save_log(f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}\n\n", with_exit=True)
         save_log("Удаление файлов/директорий завершено успешно", info_level=True)
-        print("0")
-        sys.exit(0)
 
     except Exception as e:
         save_log(f"Ошибка при удалении: {str(e)}", with_exit=True)
@@ -466,8 +464,6 @@ def check_param_file_key(
                     save_log(f"Ошибка копирования файла {airflow_deploy_dir_path} на хост {host}: {str(e)}", with_exit=True)
 
         save_log("Результат деплоя файлов: успешно", info_level=True)
-        print("0")
-        sys.exit(0)
 
     except Exception as e:
         save_log(f"{current_datetime} {real_name} Ошибка при деплое файла: {str(e)}\n\n", with_exit=True)
@@ -566,7 +562,7 @@ def remove_destination_folders() -> None:
 
 
 
-def check_param_f_key() -> None:
+def check_param_h_key() -> None:
     """
     Блок справки по ключу -h.
     """
@@ -715,8 +711,6 @@ def check_param_dir_key(
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
                     )
                     save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
-        print("0")
-        sys.exit(0)
 
     except Exception as e:
         save_log(f"{current_datetime} {real_name} Ошибка при деплое директории: {str(e)}\n\n", with_exit=True)
@@ -1217,7 +1211,7 @@ def main() -> None:
 
 
     if CONFIGURATION == "cluster":
-        processes = [Process(target=host_checks, args=(hostname, ALL_ERROR)) for hostname in all_hosts]
+        processes = [Process(target=host_checks, args=(hostname,)) for hostname in all_hosts]
         for p in processes:
             p.start()
         for p in processes:
@@ -1226,6 +1220,7 @@ def main() -> None:
 
     check_files_in_dirs()
     check_param_run(keys, paths)
+
     rsync_host(paths, hosts)
     save_log(f"Синхронизация завершена успешно для {hosts} хостов")
 
