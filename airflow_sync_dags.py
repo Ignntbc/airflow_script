@@ -228,7 +228,7 @@ def param_run_script(keys: list[str]) -> None:
 
     for key in keys:
         if key not in ALL_KEYS:
-            save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {sys.argv[1:]}\n\n", with_exit=True)
+            save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {keys}\n\n", with_exit=True)
         if key == "-h":
             check_param_f_key()
             sys.exit(0)
