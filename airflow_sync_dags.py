@@ -95,7 +95,7 @@ def is_dir_allowed(path: str) -> bool:
     """
     print(path)
     for allowed_prefix in list_folders:
-        if path.startswith(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\'):# and len(path) > len(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\')
+        if path.startswith(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\'):# and len(path) > len(allowed_prefix)
             return True
     return False
 
@@ -288,6 +288,7 @@ def run_command_with_log(
         logger.info("stdout: %s", stdout_decoded)
     if stderr_decoded:
         logger.error("stderr: %s", stderr_decoded)
+        sys.exit(1)
 
     # Проверка ошибок rsync
     if rsync_error and "rsync error" in stderr_decoded:
@@ -883,14 +884,14 @@ def check_groups_users(host: str) -> None:
                 find_group_cmd = f"{SSH_USER}@{host} find {dir_path} ! -group airflow"
                 check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа на хосте", host)
                 save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-                find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow_deploy ! -user airflow"
+                find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow_deploy" #TODO ! -user airflow вернуть проверку на юзера
                 check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец на хосте", host)
             else:
                 save_log(f"Проверка группы для директории: {dir_path} на хосте {host}")
                 find_group_cmd = f"find {dir_path} ! -group airflow_deploy ! -group airflow"
                 check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа", host)
                 save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-                find_user_cmd = f"find {dir_path} ! -user airflow_deploy ! -user airflow"
+                find_user_cmd = f"find {dir_path} ! -user airflow_deploy" #TODO ! -user airflow вернуть проверку на юзера
                 check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец", host)
         save_log(f"Результат проверки групп и владельцев на хосте {host}: завершено без ошибок")
     except Exception as e:
