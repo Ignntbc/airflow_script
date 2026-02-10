@@ -445,14 +445,13 @@ def check_param_file_key(
             if not os.path.exists(airflow_deploy_dir_path):
                 save_log(f"Файл не найден для деплоя: {airflow_deploy_dir_path}", with_exit=True)
             
-
-            # Устанавливаем права: 0600 для keytab/keys, 0755 для остальных
             if path.startswith("keytab") or path.startswith("keys"):
-                chmod_flag = "0600"
+                if path.count("/") > 1:
+                    CHMOD_STRING = CHMOD_WITHOUT_DO_FU_DG_FO_STRING
+                else:
+                    CHMOD_STRING = CHMOD_WITHOUT_FU_FO_STRING
             else:
-                chmod_flag = "0755"
-
-            chmod_option = f"--chmod=Du={chmod_flag},Dg={chmod_flag},Do=,Fg={chmod_flag},Fu=,Fo="
+                CHMOD_STRING = CHMOD_FG_FU_FO_STRING
 
             if CONFIGURATION == "one-way":
                 hosts = ["127.0.0.1"]
@@ -465,23 +464,23 @@ def check_param_file_key(
                 try:
                     if path.count("/") > 1:
                         run_command_with_log(
-                            f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}',
+                            f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}',
                             f"Dry-run rsync для файла:  {AIRFLOW_PATH}{path} на хосте {host}",
                             rsync_error=True
                         )
                         run_command_with_log(
-                            f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}',
+                            f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}',
                             f"Деплой файла:  {AIRFLOW_PATH}{path} на хосте {host}",
                         )
                         save_log(f"Файл успешно скопирован: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
                     else:
                         run_command_with_log(
-                            f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}",
+                            f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}",
                             f"Dry-run rsync для файла:  {AIRFLOW_PATH}{path} на хосте {host}",
                             rsync_error=True
                         )
                         run_command_with_log(
-                            f"{RSYNC_CHECKSUM} {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}",
+                            f"{RSYNC_CHECKSUM} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}",
                             f"Деплой файла:  {AIRFLOW_PATH}{path} на хосте {host}",
                         )
                         save_log(f"Файл успешно скопирован: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
@@ -712,35 +711,31 @@ def check_param_dir_key(
             hosts = [LOCAL_DEPLOY] if CONFIGURATION == "one-way" else all_hosts
             host_prefix = "" if CONFIGURATION == "one-way" else "airflow_deploy@{host}:"
 
-            # Устанавливаем права: 0600 для keytab/keys, 0755 для остальных
             if path.startswith("keytab") or path.startswith("keys"):
-                chmod_flag = "0600"
+                CHMOD_STRING = CHMOD_WITHOUT_DO_FU_DG_FO_STRING #if path.count("/") > 1 else CHMOD_WITHOUT_FU_FO_STRING
             else:
-                chmod_flag = "0755"
-
-            # Формируем строку для передачи прав через --chmod
-            chmod_option = f"--chmod=Du={chmod_flag},Dg={chmod_flag},Do=,Fg={chmod_flag},Fu=,Fo="
+                CHMOD_STRING = CHMOD_FG_FU_FO_STRING
 
             for host in hosts:
                 if path.count("/") > 1:
                     run_command_with_log(
-                        f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}',
+                        f'{RSYNC_CHECKSUM_DR_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}',
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Dry-Run для директории:  {AIRFLOW_PATH}{path}\n\n",
                         rsync_error=True
                     )
                     run_command_with_log(
-                        f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}',
+                        f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}',
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
                     )
                     save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
                 else:
                     run_command_with_log(
-                        f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}",
+                        f"{RSYNC_DRY_RUN} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}",
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Dry-Run для директории:  {AIRFLOW_PATH}{path}\n\n",
                         rsync_error=True
                     )
                     run_command_with_log(
-                        f"{RSYNC_CHECKSUM} {CHOWN_STRING} {chmod_option} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}",
+                        f"{RSYNC_CHECKSUM} {CHOWN_STRING} {CHMOD_STRING} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}",
                         f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
                     )
                     save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
