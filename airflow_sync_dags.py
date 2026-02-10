@@ -42,8 +42,6 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     """
     if len(keys) == 3:
         triple = frozenset(keys)
-        print(triple)
-        print(KEY_MATRIX)
         if triple in KEY_MATRIX:
             return KEY_MATRIX[triple]
         
@@ -78,6 +76,7 @@ CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=rw,Fu=,Fo="
 CHMOD_WITHOUT_DO_FU_DG_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=,Fu=,Fo="
 
 VERBOSE =  len(sys.argv) > 1 and sys.argv[1] == "-v"
+list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 ext_map = {
     f"{AIRFLOW_DEPLOY_PATH}dags/sql": ".sql",
@@ -95,13 +94,13 @@ def is_dir_allowed(path: str) -> bool:
     Путь разрешён, если он начинается с одного из ключей ext_map.
     """
     print(path)
-    for allowed_prefix in ext_map:
-        if path.startswith(allowed_prefix):# and len(path) > len(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\')
+    for allowed_prefix in list_folders:
+        if path.startswith(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\'):# and len(path) > len(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\')
             return True
     return False
 
 size_airflow_deploy = int(os.popen("du -s app/airflow_deploy | cut -f1").read())
-list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
+
 
 LOCAL_TEST = True
 if LOCAL_TEST:
