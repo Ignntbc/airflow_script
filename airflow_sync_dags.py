@@ -833,7 +833,7 @@ def check_permission_type(
             cmd = f"{SSH_USER}@{host} find {folder} ! -group airflow"
             log_prefix = "Проверка группы:"
         else:
-            cmd = f"{SSH_USER}@{host} find {folder} ! -user airflow_deploy ! -user airflow"
+            cmd = f"{SSH_USER}@{host} find {folder} ! -user airflow_deploy"#TODO ! -user airflow вернуть проверку на юзера
             log_prefix = "Проверка владельца:"
 
         save_log(f"{log_prefix} {cmd}")
