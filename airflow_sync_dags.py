@@ -849,7 +849,7 @@ def check_permission_type(
         save_log(f"Запуск проверки прав доступа для {folder} на хосте {host}")
         folder_name = os.path.basename(folder.rstrip('/'))
         if folder_name in ("keys", "keytab"):
-            perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0060"
+            perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0600"
         else:
             perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0755"
         
