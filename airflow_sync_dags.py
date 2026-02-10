@@ -6,7 +6,6 @@ import sys
 import subprocess
 import socket
 import logging
-from multiprocessing import Process, Queue
 from datetime import datetime
 from typing import List
 
@@ -57,11 +56,7 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
 
 GLOBAL_LIST_ERROR = set()
 
-result_queue = Queue()
-ALL_ERROR = Queue()
 
-END_WORK_SCRIPT_STRING = "\n****************************************** END WORK SCRIPT *******************************************\n\n"
-END_ALL_ERRORS_STRING = "\n******************************************* END ALL ERORRS *******************************************\n\n"
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogp --rsync-path="mkdir -p'
 RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogp --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogp'
@@ -208,6 +203,7 @@ def check_real_user() -> str:
 
         if stdout_output:
             try:
+                print(stdout_output)
                 real_server_name = stdout_output.split(" ")[0].split("(")[1].split(")")[0]
                 save_log(f"Пользователь определён по stdout: {real_server_name}")
             except (ValueError, IndexError) as e:
@@ -215,6 +211,7 @@ def check_real_user() -> str:
                 real_server_name = None
         else:
             try:
+                print(stderr_output)
                 real_server_name = stderr_output.split(" ")[1].replace(":", "").strip()
                 save_log(f"Пользователь определён по stderr: {real_server_name}", info_level=True)
             except (ValueError, IndexError) as e:
@@ -299,11 +296,10 @@ def run_command_with_log(
 def check_permissions(host: str) -> None:
     """
     Проверяет права доступа к файлам и директориям на целевых хостах.
-    Если права некорректны — добавляет ошибку в очередь all_error.
+    Если права некорректны — логирует ошибку и завершает выполнение скрипта.
 
     Параметры:
         host (str): Имя или адрес хоста, на котором выполняется проверка.
-        all_error (Queue): Очередь для передачи сообщений об ошибках.
     """
     save_log(f"Запуск проверки прав доступа на хосте: {host}")
     try:
@@ -323,7 +319,7 @@ def check_permission_dir_and_files(find_cmd: str,
                     host: str) -> None:
     """
     Выполняет проверку прав доступа к файлам/директориям на целевом хосте с помощью команды find.
-    Для каждого найденного объекта с некорректными правами вызывает ls -l и добавляет ошибку в очередь all_error.
+    Для каждого найденного объекта с некорректными правами вызывает ls -l и логирует ошибку, завершает выполнение скрипта.
 
     Параметры:
         find_cmd (str): Команда find для поиска файлов/директорий с некорректными правами.
@@ -492,47 +488,6 @@ def check_param_file_key(
     except Exception as e:
         save_log(f"{current_datetime} {real_name} Ошибка при деплое файла: {str(e)}\n\n", with_exit=True)
 
-
-# def check_param_c_key(remove_files_folders: set,
-#                     all_error:Queue) -> set:
-#     """
-#     Очищает содержимое всех целевых директорий Airflow (для one-way).
-#     Удаляет все файлы и поддиректории, кроме __pycache__ и dags/sql (последняя обрабатывается отдельно).
-
-#     Параметры:
-#         remove_files_folders (set): Множество для сбора информации об удалённых файлах/директориях.
-
-#     Возвращает:
-#         set: Обновлённое множество с информацией об удалённых файлах/директориях.
-#     """
-#     logger.debug("Запуск очистки целевых директорий Airflow (ключ -c)")
-#     try:
-#         check_files_in_dirs(all_error)
-#         logger.debug("Проверка наличия файлов для очистки завершена")
-#         if CONFIGURATION == "one-way":
-#             for folder in list_folders:
-#                 folder_path = f"{AIRFLOW_PATH}{folder}/"
-#                 logger.debug("Очистка директории: %s", folder_path)
-#                 for entry in os.listdir(folder_path):
-#                     full_path = f"{folder_path}{entry}"
-#                     if "__pycache__" in full_path or full_path == f"{AIRFLOW_PATH}dags/sql":
-#                         continue
-#                     logger.debug("Удаление: %s", full_path)
-#                     remove_files_folders = remove_path(full_path, remove_files_folders)
-#                 if folder == "dags":
-#                     sql_dir = f"{AIRFLOW_PATH}dags/sql/"
-#                     logger.debug("Очистка директории SQL: %s", sql_dir)
-#                     for sql_entry in os.listdir(sql_dir):
-#                         sql_path = f"{sql_dir}{sql_entry}"
-#                         logger.debug("Удаление: %s", sql_path)
-#                         remove_files_folders = remove_path(sql_path, remove_files_folders)
-#             logger.debug("Очистка целевых директорий завершена успешно")
-#             return remove_files_folders
-        
-    # except Exception as e:
-    #     logger.error("Ошибка при очистке директорий: %s", str(e))
-    #     print(1)
-    #     sys.exit(1)
 
 def remote_delete_items(elem: str, host_name: str) -> None:
     """
@@ -786,10 +741,7 @@ def check_param_run(keys: list[str],
 def check_files_in_dirs() -> None:
     """
     Проверяет наличие файлов и директорий для переноса в  {AIRFLOW_DEPLOY_PATH}*.
-    Если данных нет — добавляет ошибку в очередь all_error.
-
-    Параметры:
-        all_error (Queue): Очередь для передачи сообщений об ошибках.
+    Если данных нет — логирует ошибку и завершает выполнение скрипта.
     """
     save_log(f"Запуск проверки наличия файлов и директорий для переноса в {AIRFLOW_DEPLOY_PATH}")
     try:
@@ -818,12 +770,12 @@ def check_permission_type(
 ) -> None:
     """
     Проверяет корректность групп или владельцев файлов/директорий на целевых хостах.
-    Если найдены некорректные группы или владельцы — добавляет ошибку в очередь ALL_ERROR.
+    Если найдены некорректные группы или владельцы — логирует ошибку и завершает выполнение скрипта.
     Параметры:
         host (str): Имя или адрес хоста, на котором выполняется проверка.
         folder (str): Путь к директории для проверки.
         check_type (str): Тип проверки - "group" для групп, "user" для владельцев.
-        error_msg (str): Сообщение об ошибке для добавления в очередь ALL_ERROR.
+        error_msg (str): Сообщение об ошибке для логирования.
     """
     try:
         save_log(f"Запуск проверки {check_type} для {folder} на хосте {host}")
@@ -869,7 +821,7 @@ def check_permission_type(
 def check_groups_users(host: str) -> None:
     """
     Проверяет корректность групп и владельцев файлов/директорий на целевых хостах.
-    Если найдены некорректные группы или владельцы — добавляет ошибку в очередь all_error.
+    Если найдены некорректные группы или владельцы — логирует ошибку и завершает выполнение скрипта.
 
     Параметры:
         host (str): Имя или адрес хоста, на котором выполняется проверка.
@@ -973,7 +925,7 @@ def check_type_file(dir_folder: str, type_files: list[str]) -> None:
 def connect_write(host: str) -> None:
     """
     Проверяет доступность хоста с помощью команды ping.
-    В случае недоступности хоста добавляет ошибку в очередь all_error.
+    В случае недоступности хоста логирует ошибку и завершает выполнение скрипта.
 
     Параметры:
         host (str): Имя или адрес хоста для проверки доступности.
