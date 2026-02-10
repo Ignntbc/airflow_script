@@ -196,7 +196,7 @@ def check_real_user() -> str:
     save_log("Запуск определения имени пользователя (check_real_user)")
     try:
         with subprocess.Popen(
-            "${SUDO_USER:-${USER}}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            "whoami", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         ) as request_name:
             stdout_output = request_name.stdout.read().decode("utf-8") if request_name.stdout else ""
             stderr_output = request_name.stderr.read().decode("utf-8") if request_name.stderr else ""
