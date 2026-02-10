@@ -40,26 +40,20 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     :param keys: список ключей без дефисов, например ['c', 'delete']
     :return: True если разрешено, иначе False
     """
-    # Если три ключа, сначала проверяем тройку целиком
     if len(keys) == 3:
         triple = frozenset(keys)
         print(triple)
         print(KEY_MATRIX)
         if triple in KEY_MATRIX:
             return KEY_MATRIX[triple]
-    # Если два ключа, сначала проверяем пару целиком
+        
     elif len(keys) == 2:
         pair = frozenset(keys)
         if pair in KEY_MATRIX:
             return KEY_MATRIX[pair]
     else:
         return keys[0] in ALL_KEYS
-    # Проверяем каждую пару ключей
-    # for i, key1 in enumerate(keys):
-    #     for j in range(i + 1, len(keys)):
-    #         pair = frozenset([key1, keys[j]])
-    #         if not KEY_MATRIX.get(pair, False):
-    #             return False
+
     return False
 
 
@@ -100,7 +94,7 @@ def is_dir_allowed(path: str) -> bool:
     Проверяет, разрешён ли путь согласно ext_map.
     Путь разрешён, если он начинается с одного из ключей ext_map.
     """
-    for allowed_prefix in ext_map.keys():
+    for allowed_prefix in ext_map:
         if path.startswith(allowed_prefix):# and len(path) > len(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\')
             return True
     return False
