@@ -204,7 +204,7 @@ def check_real_user() -> str:
         if stdout_output:
             try:
                 print(stdout_output)
-                real_server_name = stdout_output.split(" ")[0].split("(")[1].split(")")[0]
+                real_server_name = stdout_output.strip()#stdout_output.split(" ")[0].split("(")[1].split(")")[0]
                 save_log(f"Пользователь определён по stdout: {real_server_name}")
             except (ValueError, IndexError) as e:
                 save_log(f"Ошибка разбора stdout при определении пользователя: {e}", with_exit=True)
@@ -212,7 +212,7 @@ def check_real_user() -> str:
         else:
             try:
                 print(stderr_output)
-                real_server_name = stderr_output.split(" ")[1].replace(":", "").strip()
+                real_server_name = stderr_output.strip()#stderr_output.split(" ")[1].replace(":", "").strip()
                 save_log(f"Пользователь определён по stderr: {real_server_name}", info_level=True)
             except (ValueError, IndexError) as e:
                 save_log(f"Ошибка разбора stderr при определении пользователя: {e}", with_exit=True)
