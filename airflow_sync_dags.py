@@ -34,18 +34,30 @@ KEY_MATRIX = {
     # Остальные сочетания считаются запрещёнными по умолчанию
 }
 
-def is_key_combination_allowed(keys):
+def is_key_combination_allowed(keys: List[str]) -> bool:
     """
     Проверяет, разрешена ли комбинация ключей согласно матрице.
     :param keys: список ключей без дефисов, например ['c', 'delete']
     :return: True если разрешено, иначе False
     """
+    # Если три ключа, сначала проверяем тройку целиком
+    if len(keys) == 3:
+        triple = frozenset(keys)
+        if triple in KEY_MATRIX:
+            return KEY_MATRIX[triple]
+    # Если два ключа, сначала проверяем пару целиком
+    elif len(keys) == 2:
+        pair = frozenset(keys)
+        if pair in KEY_MATRIX:
+            return KEY_MATRIX[pair]
+    else:
+        return keys[0] in ALL_KEYS
     # Проверяем каждую пару ключей
-    for i, key1 in enumerate(keys):
-        for j in range(i + 1, len(keys)):
-            pair = frozenset([key1, keys[j]])
-            if not KEY_MATRIX.get(pair, False):
-                return False
+    # for i, key1 in enumerate(keys):
+    #     for j in range(i + 1, len(keys)):
+    #         pair = frozenset([key1, keys[j]])
+    #         if not KEY_MATRIX.get(pair, False):
+    #             return False
     return True
 
 
