@@ -243,7 +243,6 @@ def param_run_script(keys: list[str]) -> None:
         - имя пользователя,
         - параметр запуска (если передан -c, то отмечается, иначе пишется 'false key').
     """
-    save_log("******************************************* Run script *******************************************", info_level=True)
     current_datetime = datetime.now()
     save_log(f"Start run script: {current_datetime}", info_level=True)
     save_log(f"User: {real_name}", info_level=True)
@@ -1222,6 +1221,7 @@ def main() -> None:
     Основная функция скрипта, выполняющая синхронизацию директорий и проверку параметров.
     В зависимости от конфигурации (one-way или cluster) выполняет соответствующие действия.
     """
+    save_log("******************************************* Run script *******************************************", info_level=True)
     for check_folder, check_extension in ext_map.items():
         check_type_file(check_folder, check_extension)
 
