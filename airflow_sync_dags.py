@@ -43,6 +43,8 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     # Если три ключа, сначала проверяем тройку целиком
     if len(keys) == 3:
         triple = frozenset(keys)
+        print(triple)
+        print(KEY_MATRIX)
         if triple in KEY_MATRIX:
             return KEY_MATRIX[triple]
     # Если два ключа, сначала проверяем пару целиком
