@@ -58,7 +58,7 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     #         pair = frozenset([key1, keys[j]])
     #         if not KEY_MATRIX.get(pair, False):
     #             return False
-    return True
+    return False
 
 
 GLOBAL_LIST_ERROR = set()
