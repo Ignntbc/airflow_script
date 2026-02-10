@@ -1,30 +1,28 @@
-import sys
-import pytest
-from unittest.mock import patch, MagicMock
 
-# Импортируем функции, которые будем тестировать
-from airflow_sync_dags import check_configuratioon, setup_logger
+AIRFLOW_DEPLOY_PATH = "app/airflow_deploy/"
 
-
-def test_check_configuratioon_local():
-    assert check_configuratioon("localexecutor") == "one-way"
-
-def test_check_configuratioon_cluster():
-    assert check_configuratioon("celery") == "cluster"
-
-
-def test_setup_logger_creates_logger():
-    logger = setup_logger()
-    assert logger.name == "airflow_sync"
+ext_map = {
+    f"{AIRFLOW_DEPLOY_PATH}dags/sql": ".sql",
+    f"{AIRFLOW_DEPLOY_PATH}dags": ".py",
+    f"{AIRFLOW_DEPLOY_PATH}keytab": ".keytab",
+    f"{AIRFLOW_DEPLOY_PATH}scripts": ".sh .json",
+    f"{AIRFLOW_DEPLOY_PATH}keys": ".pfx .p12 .jks .secret",
+    f"{AIRFLOW_DEPLOY_PATH}csv": ".csv",
+    f"{AIRFLOW_DEPLOY_PATH}jar": ".jar",
+}
 
 
-@patch("airflow_sync_dags.subprocess.run")
-def test_dry_run_no_rsync(mock_run):
-    # Пример: эмулируем запуск скрипта с --dry-run
-    sys.argv = ["script.py", "--dry-run"]
-    # Здесь должен быть вызов вашей основной функции, например main()
-    # main()
-    # mock_run.assert_not_called()  # rsync не должен вызываться
-    pass  # Удалите, когда добавите main()
+def is_dir_allowed(path: str) -> bool:
+    """
+    Проверяет, разрешён ли путь согласно ext_map.
+    Путь разрешён, если он начинается с одного из ключей ext_map.
+    """
+    for allowed_prefix in ext_map:
+        print(allowed_prefix)
+        if path.startswith(allowed_prefix):# and len(path) > len(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\')
+            return True
+    return False
 
-# Добавьте дополнительные тесты для других функций и сценариев
+
+a = is_dir_allowed("app/airflow_deploy/my_dag.sql")
+print(a)

@@ -27,6 +27,10 @@ KEY_MATRIX = {
     frozenset(['--dry-run', '--dir']): True,
     frozenset(['--dry-run', '--file']): True,
     frozenset(['--dry-run', '-c']): True,
+    frozenset(['-v', '--dry-run', '--delete']): True,
+    frozenset(['-v', '--dry-run', '--dir']): True,
+    frozenset(['-v', '--dry-run', '--file']): True,
+    frozenset(['-v', '--dry-run', '-c']): True,
     # Остальные сочетания считаются запрещёнными по умолчанию
 }
 
@@ -76,6 +80,16 @@ ext_map = {
     f"{AIRFLOW_DEPLOY_PATH}csv": ".csv",
     f"{AIRFLOW_DEPLOY_PATH}jar": ".jar",
 }
+
+def is_dir_allowed(path: str) -> bool:
+    """
+    Проверяет, разрешён ли путь согласно ext_map.
+    Путь разрешён, если он начинается с одного из ключей ext_map.
+    """
+    for allowed_prefix in ext_map.keys():
+        if path.startswith(allowed_prefix):# and len(path) > len(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\')
+            return True
+    return False
 
 size_airflow_deploy = int(os.popen("du -s app/airflow_deploy | cut -f1").read())
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
@@ -523,7 +537,7 @@ def remote_delete_items(elem: str, host_name: str) -> None:
         items = [x for x in items_str.split("\n") if x not in {".", "..", ""}]
         if elem == "dags":
             for item in items:
-                if "__pycache__" in item:
+                if "__pycache__" in item or ".pyc" in item:
                     continue
                 result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/{item}", f"Удаление: {AIRFLOW_PATH}dags/{item} на хосте {host_name}", info_level=True)
                 save_log(f"Результат удаления {AIRFLOW_PATH}dags/{item} на хосте {host_name}: {result.strip()}", info_level=True)
@@ -747,6 +761,10 @@ def check_param_run(keys: list[str],
             "-c": remove_destination_folders,
             "--dry-run": check_rsync_host
         }
+        if "--dry-run" in keys:
+            check_rsync_host()
+            keys.remove("--dry-run")
+            
         for key in keys:
             func = key_func_map.get(key)
             if func:
@@ -1151,8 +1169,8 @@ def check_rsync_host() -> None:
             except Exception as e:
                 save_log(f"Ошибка при dry-run rsync для директории {folder} на хосте {host_name}: {str(e)}", with_exit=True)
 
-    print("0")
-    sys.exit(0)
+    # print("0")
+    # sys.exit(0)
 
 def host_checks(hostname: str) -> None:
     """
@@ -1200,9 +1218,13 @@ def main() -> None:
 
     paths, keys = parse_args(sys.argv)
     key_allowed = is_key_combination_allowed(keys)
-
     if not key_allowed:
         save_log(f"Ошибка: недопустимая комбинация ключей: {keys}", with_exit=True)
+    
+    for path in paths:
+        dir_allowed = is_dir_allowed(path)
+        if not dir_allowed:
+            save_log(f"Ошибка: недопустимый путь для синхронизации: {path}", with_exit=True)
 
     param_run_script(keys)
     hosts = []
@@ -1223,7 +1245,8 @@ def main() -> None:
         #     p.start()
         # for p in processes:
         #     p.join()
-        check = [host_checks(hostname) for hostname in all_hosts]
+        for hostname in all_hosts:
+            host_checks(hostname)
         hosts = all_hosts
 
     check_files_in_dirs()
