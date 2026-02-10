@@ -137,7 +137,7 @@ def check_configuratioon(executor_type: str) -> str:
 CONFIGURATION= check_configuratioon(EXECUTOR_TYPE)
 
 LOG_DIR = '/app/airflow_deploy/log/'
-LOG_FILE = os.path.join(LOG_DIR, 'script.log')
+LOG_FILE = os.path.join(LOG_DIR, 'deploy.log')
 
 def setup_logger() -> logging.Logger:
     """
@@ -852,7 +852,7 @@ def check_permission_type(
         else:
             perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0755"
         
-        perm_error_prefix = f"Ошибка !!! Некорректные права для {folder} на хосте"
+        perm_error_prefix = f"Ошибка !!! Некорректные права для {folder} на хосте {host}"
 
         save_log(f"Проверка прав доступа: {perm_cmd}")
         perm_result = os.popen(perm_cmd).read().split("\n")
@@ -998,7 +998,8 @@ def check_free_space(data_host: str) -> None:
     try:
         result_command = run_command_with_log(
             f"{SSH_USER}@{data_host} df /app  --output=avail,used | tail -n +2 | tr -d '%'",
-            f"Проверка свободного места на /app хоста {data_host}"
+            f"Проверка свободного места на /app хоста {data_host}",
+            info_level=True
         )
         save_log(f"Результат команды df: '{result_command}'")
         parts = result_command.split()
