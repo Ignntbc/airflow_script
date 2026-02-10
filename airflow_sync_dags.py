@@ -94,6 +94,7 @@ def is_dir_allowed(path: str) -> bool:
     Проверяет, разрешён ли путь согласно ext_map.
     Путь разрешён, если он начинается с одного из ключей ext_map.
     """
+    print(path)
     for allowed_prefix in ext_map:
         if path.startswith(allowed_prefix):# and len(path) > len(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\')
             return True
