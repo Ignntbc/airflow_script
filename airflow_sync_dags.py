@@ -850,7 +850,7 @@ def check_permission_type(
         if folder_name in ("keys", "keytab"):
             perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0600"
         else:
-            perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0755"
+            perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0755 ! -perm 0775"
         
         perm_error_prefix = f"Ошибка !!! Некорректные права для {folder} на хосте {host}"
 
@@ -998,7 +998,7 @@ def check_free_space(data_host: str) -> None:
     try:
         result_command = run_command_with_log(
             f"{SSH_USER}@{data_host} df /app  --output=avail,used | tail -n +2 | tr -d '%'",
-            f"Проверка свободного места на /app хоста {data_host}",
+            f"Проверка свободного места на /app хост {data_host}",
             info_level=True
         )
         save_log(f"Результат команды df: '{result_command}'")
