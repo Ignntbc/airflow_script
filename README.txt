@@ -36,3 +36,18 @@ sudo -u airflow_deploy python3 /app/airflow_deploy/airflow_sync_dags.py --dry-ru
 python3 /app/airflow_deploy/airflow_sync_dags.py --file dags/test dags/test_2
 
 В процессе работы ведется лог аудита (для просмотра: cat /app/airflow_deploy/log/deploy.log)
+
+Матрица конфликтов ключей
++ конфликт
+- допустимо
+
+
+          |   h   |   c   |  dir  | file  | delete |  v   | dry-run
+-----------------------------------------------------------------------
+h         |   x   |   +   |   +   |   +   |   +    |  +   |   +
+c         |   +   |   x   |   +   |   +   |   +    |  -   |   -
+dir       |   +   |   +   |   x   |   +   |   +    |  -   |   -
+file      |   +   |   +   |   +   |   x   |   +    |  -   |   -
+delete    |   +   |   +   |   +   |   +   |   x    |  -   |   -
+v         |   +   |   -   |   -   |   -   |   -    |  x   |   -
+dry-run   |   +   |   -   |   -   |   -   |   -    |  -   |   x

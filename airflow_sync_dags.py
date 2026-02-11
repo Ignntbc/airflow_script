@@ -1,3 +1,4 @@
+import re
 import shutil
 import os
 import hashlib
@@ -47,7 +48,7 @@ CHMOD_WITHOUT_DO_FU_DG_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=,Fu=,Fo="
 
 VERBOSE = "-v" in sys.argv
 
-LOCAL_TEST = False
+LOCAL_TEST = True
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 ext_map = {
@@ -86,7 +87,8 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
         pair = frozenset(keys)
         if pair in KEY_MATRIX:
             return KEY_MATRIX[pair]
-    else:
+        
+    elif len(keys) == 1:
         return keys[0] in ALL_KEYS
 
     return False
@@ -130,7 +132,7 @@ def log_exceptions(log_message: str, context_arg_name: str| None = None):
                 # Получаем значение аргумента для контекста
                 save_log(message=log_message, with_exit=False)
                 context_value = None
-                if context_arg_name in func.__code__.co_varnames:
+                if context_arg_name and context_arg_name in func.__code__.co_varnames:
                     arg_index = func.__code__.co_varnames.index(context_arg_name)
                     if arg_index < len(args):
                         context_value = args[arg_index]
@@ -216,7 +218,7 @@ def save_log(message: str,
             logger.info(message)
 
 @log_exceptions(log_message="Ошибка при определении имени пользователя")
-def check_real_user() -> str:
+def check_real_user() -> str|None:
     """
     Определяет имя пользователя, под которым запущен скрипт (с учётом sudo).
 
@@ -247,6 +249,7 @@ def check_real_user() -> str:
 
     if real_server_name is None:
         save_log("Не удалось определить имя пользователя", with_exit=True)
+
     return real_server_name
 
 real_name = check_real_user()
@@ -508,114 +511,51 @@ def remove_destination_folders() -> None:
     sys.exit(0)
 
 
-
 def check_param_h_key() -> None:
     """
     Блок справки по ключу -h.
     """
-    print(
-        "\033[32m{}\033[0m".format(
-            "\n             Доступны следующие расширения:\n"
-        )
-    )
-    print("       Директория                     Расширение\n")
-    print(f"{AIRFLOW_DEPLOY_PATH}dags            .py .sql .json\n")
-    print(f"{AIRFLOW_DEPLOY_PATH}keytab          .keytab\n")
-    print(f"{AIRFLOW_DEPLOY_PATH}keys            .pfx .p12 .jks .secret\n")
-    print(f"{AIRFLOW_DEPLOY_PATH}csv             .csv\n")
-    print(f"{AIRFLOW_DEPLOY_PATH}jar             .jar\n")
-    print(f"{AIRFLOW_DEPLOY_PATH}user_data         *\n")
-    print(
-        "\033[32m{}\033[0m".format(
-            "\nДОСТУПНЫЕ КЛЮЧИ: [-c], [-h], [--delete], [--file], [--dir]\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА БЕЗ ПАРАМЕТРОВ:"))
-    print(
-        f"    Синхронизация содержимого директорий  {AIRFLOW_DEPLOY_PATH}dags,  {AIRFLOW_DEPLOY_PATH}keytab,  {AIRFLOW_DEPLOY_PATH}scripts,"
-    )
-    print(
-        f" {AIRFLOW_DEPLOY_PATH}keys,  {AIRFLOW_DEPLOY_PATH}csv,  {AIRFLOW_DEPLOY_PATH}jar,  {AIRFLOW_DEPLOY_PATH}user_data с соответствующими директориями в /app/airflow"
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА С КЛЮЧОМ -c:"))
-    print(
-        f"    Производится очистка директории назначения ( {AIRFLOW_PATH}dags,  {AIRFLOW_PATH}keytab,  {AIRFLOW_PATH}scripts,)"
-    )
-    print(
-        f" {AIRFLOW_PATH}keys,  {AIRFLOW_PATH}csv,  {AIRFLOW_PATH}jar,  {AIRFLOW_PATH}user_data) перед синхронизацией"
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -c\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("Запуск скрипта с ключом -h:"))
-    print("    Вывод справки")
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -h\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("Запуск скрипта с ключом --delete:"))
-    print(
-        f"    Удаление файла или директории(отсчет идет от  {AIRFLOW_DEPLOY_PATH})"
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА (Удаление файла): sudo -u airflow_deploy ./airflow_sync_dags.sh --delete /dags/test.py"
-        )
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА (Удаление директории): sudo -u airflow_deploy ./airflow_sync_dags.sh --delete /dags/test_dir \n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("Запуск скрипта с ключом --file:"))
-    print(
-        f"    Деплой указанного файла (отсчет идет от  {AIRFLOW_DEPLOY_PATH}) из  {AIRFLOW_DEPLOY_PATH} в  {AIRFLOW_PATH}"
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА : sudo -u airflow_deploy ./airflow_sync_dags.sh --file /dags/test.py\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("Запуск скрипта с ключом --dir:"))
-    print(
-        f"    Деплой указанной директории (отсчет идет от  {AIRFLOW_DEPLOY_PATH}) из  {AIRFLOW_DEPLOY_PATH} в  {AIRFLOW_PATH}"
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА : sudo -u airflow_deploy ./airflow_sync_dags.sh --dir /dags/test_dir\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("Запуск скрипта с ключом --dry-run:"))
-    print(
-        "    Выполняет пробный запуск (dry run) без фактической синхронизации файлов. Показывает, какие изменения будут произведены, но не вносит их. Полезно для проверки перед реальным деплоем."
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --dry-run\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("Запуск скрипта с ключом -v:"))
-    print(
-        "    Включает подробный (verbose) режим вывода. Скрипт будет выводить дополнительную отладочную информацию о выполняемых действиях и командах."
-    )
-    print(
-        "\033[32m{}\033[0m".format(
-            "ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n"
-        )
-    )
-    print("\033[32m{}\033[0m".format("Ссылка на документацию Airflow:"))
-    print(
+    help_text = (
+        "\033[32m{}\033[0m".format("\n             Доступны следующие расширения:\n") +
+        "       Директория                     Расширение\n"
+        f"{AIRFLOW_DEPLOY_PATH}dags            .py .sql .json\n"
+        f"{AIRFLOW_DEPLOY_PATH}keytab          .keytab\n"
+        f"{AIRFLOW_DEPLOY_PATH}keys            .pfx .p12 .jks .secret\n"
+        f"{AIRFLOW_DEPLOY_PATH}csv             .csv\n"
+        f"{AIRFLOW_DEPLOY_PATH}jar             .jar\n"
+        f"{AIRFLOW_DEPLOY_PATH}user_data         *\n"
+        "\033[32m{}\033[0m".format("\nДОСТУПНЫЕ КЛЮЧИ: [-c], [-h], [--delete], [--file], [--dir]\n\n") +
+        "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА БЕЗ ПАРАМЕТРОВ:") + "\n"
+        f"    Синхронизация содержимого директорий  {AIRFLOW_DEPLOY_PATH}dags,  {AIRFLOW_DEPLOY_PATH}keytab,  {AIRFLOW_DEPLOY_PATH}scripts,\n"
+        f" {AIRFLOW_DEPLOY_PATH}keys,  {AIRFLOW_DEPLOY_PATH}csv,  {AIRFLOW_DEPLOY_PATH}jar,  {AIRFLOW_DEPLOY_PATH}user_data с соответствующими директориями в /app/airflow\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh\n\n") +
+        "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА С КЛЮЧОМ -c:") + "\n"
+        f"    Производится очистка директории назначения ( {AIRFLOW_PATH}dags,  {AIRFLOW_PATH}keytab,  {AIRFLOW_PATH}scripts,)\n"
+        f" {AIRFLOW_PATH}keys,  {AIRFLOW_PATH}csv,  {AIRFLOW_PATH}jar,  {AIRFLOW_PATH}user_data) перед синхронизацией\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -c\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом -h:") + "\n"
+        "    Вывод справки\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -h\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --delete:") + "\n"
+        f"    Удаление файла или директории(отсчет идет от  {AIRFLOW_DEPLOY_PATH})\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА (Удаление файла): sudo -u airflow_deploy ./airflow_sync_dags.sh --delete dags/test.py\n") +
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА (Удаление директории): sudo -u airflow_deploy ./airflow_sync_dags.sh --delete dags/test_dir \n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --file:") + "\n"
+        f"    Деплой указанного файла (отсчет идет от  {AIRFLOW_DEPLOY_PATH}) из  {AIRFLOW_DEPLOY_PATH} в  {AIRFLOW_PATH}\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА : sudo -u airflow_deploy ./airflow_sync_dags.sh --file dags/test.py\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --dir:") + "\n"
+        f"    Деплой указанной директории (отсчет идет от  {AIRFLOW_DEPLOY_PATH}) из  {AIRFLOW_DEPLOY_PATH} в  {AIRFLOW_PATH}\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА : sudo -u airflow_deploy ./airflow_sync_dags.sh --dir dags/test_dir\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --dry-run:") + "\n"
+        "    Выполняет пробный запуск (dry run) без фактической синхронизации файлов. Показывает, какие изменения будут произведены, но не вносит их. Полезно для проверки перед реальным деплоем.\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --dry-run\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом -v:") + "\n"
+        "    Включает подробный (verbose) режим вывода. Скрипт будет выводить дополнительную отладочную информацию о выполняемых действиях и командах.\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n") +
+        "\033[32m{}\033[0m".format("Ссылка на документацию Airflow:") + "\n"
         "    https://docs.cloud.vtb.ru/home/prod-catalog/application-integration/apache-airflow\n"
     )
-
+    print(help_text)
     sys.exit(0)
 
 
@@ -669,7 +609,7 @@ def check_param_dir_key(
 
 @log_exceptions(log_message="Ошибка при обработке параметров командной строки")
 def check_param_run(keys: list[str],
-                    paths: list[str]) -> set:
+                    paths: list[str]) -> None:
     """
     Обрабатывает параметры командной строки для управления синхронизацией и удалением файлов/директорий Airflow.
     Параметры:
@@ -799,14 +739,14 @@ def check_groups_users(host: str) -> None:
     save_log(f"Результат проверки групп и владельцев на хосте {host}: завершено без ошибок")
 
 
-def is_invalid_file_type(temp_file: str, dir_folder: str, type_files: list[str]) -> tuple[bool, str]:
+def is_invalid_file_type(temp_file: str, dir_folder: str, type_files: str) -> tuple[bool, str]:
     """
     Проверяет, является ли файл недопустимого типа для указанной директории.
 
     Параметры:
         temp_file (str): Полный путь к файлу для проверки.
         dir_folder (str): Путь к директории, в которой производится проверка.
-        type_files (list[str]): Список допустимых расширений файлов для директории.
+        type_files (str): Строка с допустимыми расширениями файлов для директории, разделенными запятыми.
 
     Возвращает:
         tuple[bool, str]:
@@ -825,13 +765,13 @@ def is_invalid_file_type(temp_file: str, dir_folder: str, type_files: list[str])
     return False, ""
 
 @log_exceptions("Ошибка при проверке типов файлов в директории", "dir_folder")
-def check_type_file(dir_folder: str, type_files: list[str]) -> None:
+def check_type_file(dir_folder: str, type_files: str) -> None:
     """
     Проверяет типы файлов в указанной директории и логирует ошибку, если найден недопустимый тип файла.
 
     Параметры:
         dir_folder (str): Путь к директории для проверки.
-        type_files (list[str]): Список допустимых расширений файлов для директории.
+        type_files (str): Строка с допустимыми расширениями файлов для директории, разделенными запятыми.
     """
     save_log(f"Запуск проверки типов файлов в директории: {dir_folder}")
     for root, _, files in os.walk(dir_folder):
@@ -860,7 +800,7 @@ def connect_write(host: str) -> None:
     data_connect_write = subprocess.Popen(
         f"ping -c 1 {host} ", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
-    if "Name or service not known" in data_connect_write.stderr.read().decode("utf-8"):
+    if data_connect_write.stderr and "Name or service not known" in data_connect_write.stderr.read().decode("utf-8"):
         save_log(f"Ошибка !!! Проверьте доступ к хосту {host} \n", with_exit=True)
 
 
@@ -996,6 +936,7 @@ def check_hashes(paths: list[str], hosts: list[str]) -> bool:
     :return: True если все хэши совпадают на всех хостах, иначе False.
     """
     save_log(f"Запуск проверки md5-хэшей для путей: {paths} на хостах: {hosts}")
+    all_ok = True
     for path in paths:
         src_full = os.path.join(AIRFLOW_DEPLOY_PATH, path)
         src_hashes = {}
@@ -1007,7 +948,7 @@ def check_hashes(paths: list[str], hosts: list[str]) -> bool:
             rel = path
             src_hashes[rel] = md5(src_full)
 
-        all_ok = True
+        
         for host in hosts:
             dst_hashes = get_remote_md5_hashes(host, path, is_dir)
             for rel, src_md5 in src_hashes.items():
@@ -1015,12 +956,9 @@ def check_hashes(paths: list[str], hosts: list[str]) -> bool:
                 if not dst_md5 or src_md5 != dst_md5:
                     save_log(f"Несовпадение md5 для {rel} на {host}: src={src_md5}, dst={dst_md5}", info_level=True)
                     all_ok = False
-            for rel in dst_hashes:
-                if rel not in src_hashes:
-                    save_log(f"Лишний файл {rel} на {host}", info_level=True)
-                    all_ok = False
+                    return all_ok
         
-        return all_ok
+    return all_ok
 
 
 def check_rsync_host() -> None:
@@ -1057,12 +995,14 @@ def host_checks(hostname: str) -> None:
     check_permissions(hostname)
     check_groups_users(hostname)
 
-def parse_args(script_args: list[str]) -> bool:
+def parse_args(script_args: list[str]) -> tuple[list[str], list[str]]:
     """
     Парсит аргументы командной строки для определения типа пути (файл или директория), а также для извлечения ключей.
     Параметры:
         script_args (list[str]): Аргументы командной строки (sys.argv[2:]), первый элемент — путь относительно AIRFLOW_DEPLOY_PATH.
-    :return: True если все хэши совпали, иначе False.
+    :return: Кортеж из двух списков: paths и keys.
+        - paths (list[str]): Список путей к файлам или директориям для обработки (относительно AIRFLOW_DEPLOY_PATH).
+        - keys (list[str]): Список ключей для определения действий (например, --delete, --file, --dir, -c, -h).
     """
     save_log(f"Парсинг аргументов для определения типа пути и ключей: {script_args}")
     keys = []
