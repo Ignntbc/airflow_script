@@ -32,4 +32,7 @@ sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh --dry-run
 sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh -v --file dags/example
 sudo -u airflow_deploy python3 /app/airflow_deploy/airflow_sync_dags.py --dry-run -v --delete scripts/test.json
 
+Пример запуска с множественными целевыми путями:
+python3 /app/airflow_deploy/airflow_sync_dags.py --file dags/test dags/test_2
+
 В процессе работы ведется лог аудита (для просмотра: cat /app/airflow_deploy/log/deploy.log)

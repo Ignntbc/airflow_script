@@ -1,7 +1,7 @@
 #!/bin/bash
-nice -n 20 python3 /home/smith/airflow_script/airflow_sync_dags.py "$@"
+nice -n 20 /app/airflow-venv/bin/python /app/airflow_deploy/airflow_sync_dags.py "$@"
 
-#/app/airflow-venv/bin/python
+
 # if [[ $# -eq 0 ]]
 # then
 # nice -n 20 /app/airflow-venv/bin/python /app/airflow_deploy/airflow_sync_dags.py

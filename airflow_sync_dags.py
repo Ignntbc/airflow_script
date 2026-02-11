@@ -47,7 +47,7 @@ CHMOD_WITHOUT_DO_FU_DG_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=,Fu=,Fo="
 
 VERBOSE = "-v" in sys.argv
 
-LOCAL_TEST = True
+LOCAL_TEST = False
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 ext_map = {
@@ -743,7 +743,7 @@ def check_permission_type(
         cmd = f"{SSH_USER}@{host} find {folder} ! -group airflow"
         log_prefix = "Проверка группы:"
     else:
-        cmd = f"{SSH_USER}@{host} find {folder} ! -user airflow_deploy"#TODO ! -user airflow вернуть проверку на юзера
+        cmd = f"{SSH_USER}@{host} find {folder} ! -user airflow ! -user airflow_deploy"
         log_prefix = "Проверка владельца:"
 
     save_log(f"{log_prefix} {cmd}")
@@ -787,14 +787,14 @@ def check_groups_users(host: str) -> None:
             find_group_cmd = f"{SSH_USER}@{host} find {dir_path} ! -group airflow"
             check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа на хосте", host)
             save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-            find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow_deploy" #TODO ! -user airflow вернуть проверку на юзера
+            find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow ! -user airflow_deploy"
             check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец на хосте", host)
         else:
             save_log(f"Проверка группы для директории: {dir_path} на хосте {host}")
             find_group_cmd = f"find {dir_path} ! -group airflow_deploy ! -group airflow"
             check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа", host)
             save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-            find_user_cmd = f"find {dir_path} ! -user airflow_deploy" #TODO ! -user airflow вернуть проверку на юзера
+            find_user_cmd = f"find {dir_path} ! -user airflow ! -user airflow_deploy"
             check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец", host)
     save_log(f"Результат проверки групп и владельцев на хосте {host}: завершено без ошибок")
 
