@@ -35,14 +35,14 @@ KEY_MATRIX = {
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogp --rsync-path="mkdir -p'
 RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogp --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogp'
-RSYNC_CHECKSUM = "rsync --checksum -rogp" 
+RSYNC_CHECKSUM = "rsync --checksum -rogp"
 CHOWN_STRING = "--chown=airflow_deploy:airflow"
 CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
 AIRFLOW_PATH = "/app/airflow/"
 AIRFLOW_DEPLOY_PATH = "/app/airflow_deploy/"
 LOCAL_DEPLOY = "airflow_deploy@127.0.0.1"
 SSH_USER = "ssh airflow_deploy"
-CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=rw,Fu=,Fo="
+CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo=" #"--chmod=Du=rwx,Dg=rwx,Do=,Fg=rw,Fu=,Fo="
 CHMOD_WITHOUT_DO_FU_DG_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=,Fu=,Fo="
 
 VERBOSE = "-v" in sys.argv
@@ -447,7 +447,7 @@ def check_param_file_key(
         RSYNC_CHECKSUM_DR_STRING, RSYNC_CHECKSUM_STRING, RSYNC_DRY_RUN, save_log
     """
     save_log(f"Запуск деплоя файлов: {paths}")
-    current_datetime = datetime.now()
+    # current_datetime = datetime.now()
     # try:
     for path in paths:
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{path}"
@@ -820,9 +820,9 @@ def check_permission_type(
     save_log(f"Запуск проверки прав доступа для {folder} на хосте {host}")
     folder_name = os.path.basename(folder.rstrip('/'))
     if folder_name in ("keys", "keytab"):
-        perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0600"
+        perm_cmd = f"{SSH_USER}@{host} find {folder} -type f ! -perm 0600"
     else:
-        perm_cmd = f"{SSH_USER}@{host} find {folder} ! -perm 0755 ! -perm 0775"
+        perm_cmd = f"{SSH_USER}@{host} find {folder} -type d ! -perm 0755 ! -perm 0775"
     
     perm_error_prefix = f"Ошибка !!! Некорректные права для {folder} на хосте {host}"
 
