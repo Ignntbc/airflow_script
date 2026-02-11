@@ -1,7 +1,7 @@
-airflow_sync_dags.sh (airflow_sync_dags_v2.sh)
+airflow_sync_dags
 ----------------------------------------------
 
-Скрипт позволяет синхронизировать содержимое директорий /app/airflow_deploy/dags, /app/airflow_deploy/keytab, /app/airflow_deploy/scripts, /app/airflow_deploy/keys, /app/airflow_deploy/csv, /app/airflow_deploy/jar, /app/airflow_deploy/user_data с соответствующими директориями в /app/airflow:
+Скрипт позволяет синхронизировать содержимое директории /app/airflow_deploy с соответствующими директориями в /app/airflow:
 /app/airflow_deploy/dags -> /app/airflow/dags
 /app/airflow_deploy/keytab -> /app/airflow/keytab
 /app/airflow_deploy/scripts/ -> /app/airflow/scripts
@@ -10,30 +10,26 @@ airflow_sync_dags.sh (airflow_sync_dags_v2.sh)
 /app/airflow_deploy/jar -> /app/airflow/jar
 /app/airflow_deploy/user_data -> /app/airflow/user_data
 
-Запуск скрипта: sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh
+Запуск скрипта через оболочку:
+sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh
 
-Usage: airflow_sync_dags.sh [-c] [-h]     
--c Очистить директории назначения (/app/airflow/dags, /app/airflow/keytab, /app/airflow/scripts, /app/airflow/keys, /app/airflow/csv, /app/airflow/jar, /app/airflow/user_data) перед синхронизацией
--h Help
+Запуск напрямую (без оболочки):
+sudo -u airflow_deploy python3 /app/airflow_deploy/airflow_sync_dags.py [опции]
 
-Запуск скрипта версии 2: sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags_v2.sh
+Usage: airflow_sync_dags.sh [-c] [-h] [-v] [--dry-run] [--delete] [--file] [--dir]
 
-Usage: airflow_sync_dags_v2.sh [-c] [-h]     
--c Очистить директории назначения (/app/airflow/dags, /app/airflow/keytab, /app/airflow/scripts, /app/airflow/keys, /app/airflow/csv, /app/airflow/jar, /app/airflow/user_data) перед синхронизацией
--h Help
+Описание ключей:
+--delete   Удалить указанный файл или директорию из целевой папки (например, из /app/airflow/dags и других поддерживаемых директорий).
+--file     Операция применяется к отдельному файлу.
+--dir      Операция применяется к директории.
+-c         Очистить директории назначения перед синхронизацией.
+-h         Вывести справку по использованию скрипта.
+-v         Включить подробный (verbose) режим вывода.
+--dry-run  Выполнить пробный запуск без фактической синхронизации файлов.
+
+Примеры:
+sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh --dry-run
+sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh -v --file dags/example
+sudo -u airflow_deploy python3 /app/airflow_deploy/airflow_sync_dags.py --dry-run -v --delete scripts/test.json
 
 В процессе работы ведется лог аудита (для просмотра: cat /app/airflow_deploy/log/deploy.log)
-
-airflow_delete_dags.sh
-----------------------
-
-Позволяет удалить указанный в параметре файл из директории /app/airflow/dags, либо /app/airflow/keytab, либо /app/airflow/scripts, либо /app/airflow/keys, либо /app/airflow/csv, /app/airflow/jar, /app/airflow/user_data.
-В качестве параметра указывается путь относительно /app/airflow, например, dags/example.py
-
-Запуск скрипта: sudo -u airflow_deploy /app/airflow_deploy/airflow_delete_dags.sh dags/example.py
-
-Usage: airflow_delete_dags.sh [-h] [-f] path 
--h Help
--f Не запрашивать подтверждение удаления
-
-В процессе работы ведется лог аудита, который можно просмотреть (cat /app/airflow_deploy/log/delete.log)
