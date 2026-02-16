@@ -1072,7 +1072,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str]]:
         else:
             paths.append(arg)
     
-    if keys == []:
+    if keys == [] or keys == ["-v"]:
         keys.append("")
 
     return paths, keys
