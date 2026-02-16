@@ -13,7 +13,7 @@ from typing import List
 
 CRITICAL_PERCENT = 80
 
-ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v"]
+ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", ""]
 
 KEY_MATRIX = {
     frozenset(['-v', '--delete']): True,
