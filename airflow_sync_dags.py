@@ -170,11 +170,9 @@ LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy_1.log')
 LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
 LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
 # LOG_FILE = LOG_FILE_1  # основной лог-файл для текущего запуска
-LOG_MAX_SIZE = 10 * 1024 * 1024  # 10 МБ
+LOG_MAX_SIZE = 1 * 1024 * 1024  # 10 МБ TODO вернуть 10 МБ
 
-# --- Ротация логов ---
 def rotate_logs()-> None:
-    # Проверяем размер логов и выполняем ротацию при необходимости
     def file_size(path):
         return os.path.getsize(path) if os.path.exists(path) else 0
 
