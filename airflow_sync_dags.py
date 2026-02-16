@@ -21,6 +21,7 @@ KEY_MATRIX = {
     frozenset(['-v', '--dir']): True,
     frozenset(['-v', '-c']): True,
     frozenset(['-v', '--dry-run']): True,
+    frozenset(['-v', '']): True,
     frozenset(['--dry-run', '--delete']): True,
     frozenset(['--dry-run', '--dir']): True,
     frozenset(['--dry-run', '--file']): True,
