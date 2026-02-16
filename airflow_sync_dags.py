@@ -173,10 +173,22 @@ LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
 # LOG_FILE = LOG_FILE_1  # основной лог-файл для текущего запуска
 LOG_MAX_SIZE = 1 * 10 * 1024  # 10 МБ TODO вернуть 10 МБ
 
-def rotate_logs()-> None:
-    def file_size(path):
-        return os.path.getsize(path) if os.path.exists(path) else 0
 
+def file_size(path):
+    """
+    Возвращает размер файла в байтах по указанному пути.
+    Если файл не существует, возвращает 0.
+    :param path: Путь к файлу
+    :return: Размер файла в байтах или 0, если файл не найден
+    """
+    return os.path.getsize(path) if os.path.exists(path) else 0
+
+@log_exceptions(log_message="Ошибка при ротации логов")
+def rotate_logs() -> None:
+    """
+    Выполняет ротацию лог-файлов. Если основной лог-файл превышает максимальный размер,
+    старые логи сдвигаются, а самый старый удаляется. Используется для ограничения размера логов.
+    """
     log_files = [LOG_FILE_1, LOG_FILE_2, LOG_FILE_3]
 
     if os.path.exists(log_files[0]) and file_size(log_files[0]) >= LOG_MAX_SIZE:
@@ -313,9 +325,7 @@ def param_run_script(keys: list[str]) -> None:
         - Если -h — выводит справку и завершает выполнение.
     """
     current_datetime = datetime.now()
-    # save_log(f"Start run script: {current_datetime}", info_level=True)
-    save_log(f"User: {real_name}", info_level=True)
-
+    save_log(f"{current_datetime} {real_name} Запуск скрипта с ключами: {keys}")
     for key in keys:
         if key not in ALL_KEYS:
             save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {keys}\n\n", with_exit=True)
