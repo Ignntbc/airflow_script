@@ -166,11 +166,11 @@ CONFIGURATION= check_configuratioon(EXECUTOR_TYPE)
 
 
 LOG_DIR = '/app/airflow_deploy/log/'
-LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy_1.log')
+LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy.log')
 LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
 LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
 # LOG_FILE = LOG_FILE_1  # основной лог-файл для текущего запуска
-LOG_MAX_SIZE = 1 * 1024 * 1024  # 10 МБ TODO вернуть 10 МБ
+LOG_MAX_SIZE = 1 * 10 * 1024  # 10 МБ TODO вернуть 10 МБ
 
 def rotate_logs()-> None:
     def file_size(path):
