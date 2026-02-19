@@ -1089,7 +1089,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         else:
             paths.append(f"{arg}")
 
-    if keys == [] or keys == ["-v"]:
+    if set(keys) <= {"-v", "-exclude"}:
         keys.append("")
         for list_folder in list_folders:
             paths.append(f"{list_folder}")
