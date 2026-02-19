@@ -993,9 +993,11 @@ def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: list[str]|lis
         for file in files:
             if any(file.endswith(ext) for ext in exclude_exts):
                 continue
-            abs_path = os.path.join(root, file)
-            rel = os.path.relpath(abs_path, base_dir)
-            hashes[rel] = md5(abs_path)
+            else:
+                abs_path = os.path.join(root, file)
+                rel = os.path.relpath(abs_path, base_dir)
+                hashes[rel] = md5(abs_path)
+                
     return hashes
 
 def get_remote_md5_hashes(host: str, path: str, is_dir: bool) -> dict:
@@ -1055,12 +1057,12 @@ def check_hashes(paths: list[str], hosts: list[str],
         if is_dir:
             src_hashes = get_dir_md5_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts)
         else:
-            if any(src_full.endswith(ext) for ext in exclude_exts):
-                save_log(f"Файл {src_full} исключён из проверки md5-хэша из-за расширения", info_level=True)
-                continue
-            else:
-                rel = path
-                src_hashes[rel] = md5(src_full)
+            # if any(src_full.endswith(ext) for ext in exclude_exts):
+            #     save_log(f"Файл {src_full} исключён из проверки md5-хэша из-за расширения", info_level=True)
+            #     continue
+            # else:
+            rel = path
+            src_hashes[rel] = md5(src_full)
 
         
         for host in hosts:
