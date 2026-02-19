@@ -1094,6 +1094,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         for list_folder in list_folders:
             paths.append(f"{list_folder}")
 
+    print(f"Результат парсинга аргументов: paths={paths}, keys={keys}, exclude_exts={exclude_exts}")
     return paths, keys, exclude_exts
 
 
