@@ -980,16 +980,19 @@ def path_sum_files() -> dict[str, str]:
     return path_sum
 
 
-def get_dir_md5_hashes(base_dir: str, root_dir: str) -> dict:
+def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: list[str]|list = []) -> dict:
     """
     Возвращает словарь md5-хэшей для всех файлов в директории root_dir относительно base_dir.
     :param base_dir: Базовая директория для относительных путей.
     :param root_dir: Директория, в которой искать файлы.
+    :param exclude_exts: Список расширений файлов для исключения.
     :return: dict {относительный_путь: md5}
     """
     hashes = {}
     for root, _, files in os.walk(root_dir):
         for file in files:
+            if any(file.endswith(ext) for ext in exclude_exts):
+                continue
             abs_path = os.path.join(root, file)
             rel = os.path.relpath(abs_path, base_dir)
             hashes[rel] = md5(abs_path)
@@ -1031,7 +1034,8 @@ def get_remote_md5_hashes(host: str, path: str, is_dir: bool) -> dict:
 
 
 @log_exceptions("Ошибка при проверке md5-хэшей между источником и целями")
-def check_hashes(paths: list[str], hosts: list[str]) -> bool:
+def check_hashes(paths: list[str], hosts: list[str],
+                 exclude_exts: list[str]|list = []) -> bool:
     """
     Сравнивает md5-хэши между источником и целями.
 
