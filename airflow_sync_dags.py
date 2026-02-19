@@ -53,7 +53,7 @@ def is_dir_allowed(path: str) -> bool:
     """
     for allowed_prefix in list_folders:
         print(allowed_prefix, path)
-        if path.startswith(allowed_prefix) and path[len(allowed_prefix)] in ('/', '\\'):
+        if path.startswith(allowed_prefix):
             return True
     return False
 
