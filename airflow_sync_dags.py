@@ -610,9 +610,10 @@ def check_param_dir_key(
         chmod_string = get_chmod_string(path)
 
         exclude_args = ""
+
         if exclude_exts:
             exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
-
+        save_log(f"Параметры исключения для rsync: {exclude_args}", info_level=True)
         for host in hosts:
             if path.count("/") > 1:
                 rsync_command = f'rsync {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
