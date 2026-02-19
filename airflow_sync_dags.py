@@ -1055,8 +1055,12 @@ def check_hashes(paths: list[str], hosts: list[str],
         if is_dir:
             src_hashes = get_dir_md5_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts)
         else:
-            rel = path
-            src_hashes[rel] = md5(src_full)
+            if any(src_full.endswith(ext) for ext in exclude_exts):
+                save_log(f"Файл {src_full} исключён из проверки md5-хэша из-за расширения", info_level=True)
+                continue
+            else:
+                rel = path
+                src_hashes[rel] = md5(src_full)
 
         
         for host in hosts:
