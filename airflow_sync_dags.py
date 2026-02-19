@@ -991,13 +991,12 @@ def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: list[str]|lis
     hashes = {}
     for root, _, files in os.walk(root_dir):
         for file in files:
-            if any(file.endswith(ext) for ext in exclude_exts):
+            if exclude_exts and any(file.endswith(ext) for ext in exclude_exts):
                 continue
-            else:
-                abs_path = os.path.join(root, file)
-                rel = os.path.relpath(abs_path, base_dir)
-                hashes[rel] = md5(abs_path)
-                
+            abs_path = os.path.join(root, file)
+            rel = os.path.relpath(abs_path, base_dir)
+            hashes[rel] = md5(abs_path)
+
     return hashes
 
 def get_remote_md5_hashes(host: str, path: str, is_dir: bool) -> dict:
@@ -1194,7 +1193,7 @@ def main() -> None:
 
 
     check_param_run(keys, paths, exclude_exts)
-    ok_status = check_hashes(paths, hosts)
+    ok_status = check_hashes(paths, hosts, exclude_exts)
     if not ok_status:
         save_log("Ошибка: md5-хэши не совпали после синхронизации", with_exit=True)
     
