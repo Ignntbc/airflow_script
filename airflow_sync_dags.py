@@ -1127,7 +1127,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         if arg == "-exclude":
             # Следующий аргумент — строка расширений через запятую
             if i + 2 <= len(script_args):
-                exts = script_args[i + 1].split(",")
+                exts = script_args[i + 2].split(",")
                 exclude_exts.extend([e if e.startswith(".") else f".{e}" for e in exts])
                 save_log(f"Добавлены расширения для исключения: {exclude_exts}", info_level=True)
                 skip_next = True
