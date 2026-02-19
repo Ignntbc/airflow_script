@@ -1097,7 +1097,6 @@ def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = 
         exclude_exts (list[str]): Список расширений для исключения из проверки.
     """
     connect_write(hostname)
-    # Получаем paths для передачи в check_free_space
     check_free_space(hostname, paths, exclude_exts)
     check_permissions(hostname)
     check_groups_users(hostname)
@@ -1135,13 +1134,12 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         elif arg.startswith('-'):
             keys.append(arg)
         else:
-            paths.append(arg)
+            paths.append(f"{AIRFLOW_DEPLOY_PATH}{arg}")
 
     if keys == [] or keys == ["-v"]:
         keys.append("")
-        main_folder = "app/airflow_deploy/"
         for list_folder in list_folders:
-            paths.append(f"{main_folder}{list_folder}")
+            paths.append(f"{AIRFLOW_DEPLOY_PATH}{list_folder}")
 
     return paths, keys, exclude_exts
 
