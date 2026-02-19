@@ -899,7 +899,8 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: list[str]|l
     local_size = 0
     remote_cmd = ""
 
-    for path in paths:
+    full_paths =[f"{AIRFLOW_DEPLOY_PATH}{path}" for path in paths]
+    for path in full_paths:
         if os.path.isdir(path):
             size_cmd = f'du -s "{path}" | cut -f1'
             if exclude_exts:
@@ -1134,12 +1135,12 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         elif arg.startswith('-'):
             keys.append(arg)
         else:
-            paths.append(f"{AIRFLOW_DEPLOY_PATH}{arg}")
+            paths.append(f"{arg}")
 
     if keys == [] or keys == ["-v"]:
         keys.append("")
         for list_folder in list_folders:
-            paths.append(f"{AIRFLOW_DEPLOY_PATH}{list_folder}")
+            paths.append(f"{list_folder}")
 
     return paths, keys, exclude_exts
 
