@@ -35,17 +35,6 @@ LOCAL_TEST = True
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 
-#Убрали проверку на тип файлов
-# ext_map = {
-#     f"{AIRFLOW_DEPLOY_PATH}dags/sql": ".sql",
-#     f"{AIRFLOW_DEPLOY_PATH}dags": ".py",
-#     f"{AIRFLOW_DEPLOY_PATH}keytab": ".keytab",
-#     f"{AIRFLOW_DEPLOY_PATH}scripts": ".sh .json",
-#     f"{AIRFLOW_DEPLOY_PATH}keys": ".pfx .p12 .jks .secret",
-#     f"{AIRFLOW_DEPLOY_PATH}csv": ".csv",
-#     f"{AIRFLOW_DEPLOY_PATH}jar": ".jar",
-# }
-
 def is_dir_allowed(path: str) -> bool:
     """
     Проверяет, разрешён ли путь согласно list_folders.
@@ -149,8 +138,8 @@ LOG_DIR = '/app/airflow_deploy/log/'
 LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy.log')
 LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
 LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
-# LOG_FILE = LOG_FILE_1  # основной лог-файл для текущего запуска
-LOG_MAX_SIZE = 1 * 10 * 1024  # 10 МБ TODO вернуть 10 МБ
+
+LOG_MAX_SIZE = 10 * 10 * 1024  # 10 МБ 
 
 
 def file_size(path):
@@ -177,25 +166,6 @@ def rotate_logs() -> None:
             if os.path.exists(log_files[i - 1]):
                 os.rename(log_files[i - 1], log_files[i])
     
-    # Если log_1 превышает лимит
-    # if file_size(LOG_FILE_1) >= LOG_MAX_SIZE:
-    #     # Если log_2 превышает лимит
-    #     if file_size(LOG_FILE_2) >= LOG_MAX_SIZE:
-    #         # Если log_3 тоже есть, удаляем его
-    #         if os.path.exists(LOG_FILE_3):
-    #             os.remove(LOG_FILE_3)
-    #         # log_2 -> log_3, log_1 -> log_2, новый log_1
-    #         if os.path.exists(LOG_FILE_2):
-    #             os.rename(LOG_FILE_2, LOG_FILE_3)
-    #         if os.path.exists(LOG_FILE_1):
-    #             os.rename(LOG_FILE_1, LOG_FILE_2)
-    #         # Новый log_1 будет создан автоматически
-    #     else:
-    #         # log_1 -> log_2, новый log_1
-    #         if os.path.exists(LOG_FILE_2):
-    #             os.remove(LOG_FILE_2)
-    #         if os.path.exists(LOG_FILE_1):
-    #             os.rename(LOG_FILE_1, LOG_FILE_2)
 
 
 
@@ -1053,7 +1023,7 @@ def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = 
     check_permissions(hostname)
     check_groups_users(hostname)
 
-#TODO: добавить проверку расширений файлов в директориях и при удалении 
+
 @log_exceptions("Ошибка при парсинге аргументов командной строки")
 def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]:
     """
