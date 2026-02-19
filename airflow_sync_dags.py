@@ -613,7 +613,7 @@ def check_param_dir_key(
 
         if exclude_exts:
             exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
-        save_log(f"Параметры исключения для rsync: {exclude_args}", info_level=True)
+
         for host in hosts:
             if path.count("/") > 1:
                 rsync_command = f'rsync {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
@@ -621,10 +621,6 @@ def check_param_dir_key(
                     f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && {rsync_command}',
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
                 )
-                # run_command_with_log(
-                #     f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}',
-                #     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
-                # )
                 save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
             else:
                 run_command_with_log(
@@ -799,61 +795,6 @@ def check_groups_users(host: str) -> None:
             find_user_cmd = f"find {dir_path} ! -user airflow ! -user airflow_deploy"
             check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец", host)
     save_log(f"Результат проверки групп и владельцев на хосте {host}: завершено без ошибок")
-
-
-
- 
-# Пока комментирую проверку расширений файлов
-
-# def is_invalid_file_type(temp_file: str, dir_folder: str, type_files: str) -> tuple[bool, str]:
-#     """
-#     Проверяет, является ли файл недопустимого типа для указанной директории.
-
-#     Аргументы:
-#         temp_file (str): Полный путь к файлу для проверки.
-#         dir_folder (str): Путь к директории, в которой производится проверка.
-#         type_files (str): Строка с допустимыми расширениями файлов для директории, разделенными запятыми.
-
-#     Возвращает:
-#         tuple[bool, str]:
-#             - True и сообщение об ошибке, если тип файла недопустим;
-#             - False и пустую строку, если тип файла допустим.
-#     """
-#     for prefix, ext in ext_map.items():
-#         if prefix == f"{AIRFLOW_DEPLOY_PATH}dags":
-#             if temp_file.startswith(prefix) and not temp_file.startswith(f"{AIRFLOW_DEPLOY_PATH}dags/sql"):
-#                 if temp_file.rpartition(".")[2] not in type_files:
-#                     return True, f"Ошибка !!! Недопустимый тип файла {temp_file} для директории {dir_folder} (Допустимое расширение {ext})"
-#         else:
-#             if temp_file.startswith(prefix):
-#                 if temp_file.rpartition(".")[2] not in type_files:
-#                     return True, f"Ошибка !!! Недопустимый тип файла {temp_file} для директории {dir_folder} (Допустимое расширение {ext})"
-#     return False, ""
-
-# @log_exceptions("Ошибка при проверке типов файлов в директории", "dir_folder")
-# def check_type_file(dir_folder: str, type_files: str) -> None:
-#     """
-#     Проверяет типы файлов в указанной директории и логирует ошибку, если найден недопустимый тип файла.
-
-#     Аргументы:
-#         dir_folder (str): Путь к директории для проверки.
-#         type_files (str): Строка с допустимыми расширениями файлов для директории, разделенными запятыми.
-#     """
-#     save_log(f"Запуск проверки типов файлов в директории: {dir_folder}")
-#     for root, _, files in os.walk(dir_folder):
-#         for file in files:
-#             temp_file = f"{root}{file}"
-#             if (
-#                 dir_folder == f"{AIRFLOW_DEPLOY_PATH}dags/"
-#                 and temp_file.startswith(f"{AIRFLOW_DEPLOY_PATH}dags/sql")
-#             ):
-#                 continue
-
-#             invalid, msg = is_invalid_file_type(temp_file, dir_folder, type_files)
-#             if invalid:
-#                 save_log(msg, with_exit=True)
-
-#     save_log(f"Проверка типов файлов в директории {dir_folder} завершена успешно")
 
 
 def connect_write(host: str) -> None:
