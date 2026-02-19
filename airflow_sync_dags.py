@@ -1053,7 +1053,7 @@ def check_hashes(paths: list[str], hosts: list[str],
         is_dir = os.path.isdir(src_full)
 
         if is_dir:
-            src_hashes = get_dir_md5_hashes(AIRFLOW_DEPLOY_PATH, src_full)
+            src_hashes = get_dir_md5_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts)
         else:
             rel = path
             src_hashes[rel] = md5(src_full)
