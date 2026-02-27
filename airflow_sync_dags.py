@@ -31,7 +31,7 @@ CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo="
 
 VERBOSE = "-v" in sys.argv
 
-LOCAL_TEST = True
+LOCAL_TEST = False
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 
@@ -509,14 +509,6 @@ def check_param_h_key() -> None:
     Блок справки по ключу -h.
     """
     help_text = (
-        # "\033[32m{}\033[0m".format("\n             Доступны следующие расширения:\n") +
-        # "       Директория                     Расширение\n"
-        # f"{AIRFLOW_DEPLOY_PATH}dags            .py .sql .json\n"
-        # f"{AIRFLOW_DEPLOY_PATH}keytab          .keytab\n"
-        # f"{AIRFLOW_DEPLOY_PATH}keys            .pfx .p12 .jks .secret\n"
-        # f"{AIRFLOW_DEPLOY_PATH}csv             .csv\n"
-        # f"{AIRFLOW_DEPLOY_PATH}jar             .jar\n"
-        # f"{AIRFLOW_DEPLOY_PATH}user_data         *\n"
         "\033[32m{}\033[0m".format("\nДОСТУПНЫЕ КЛЮЧИ: [-c], [-h], [--delete], [--file], [--dir]\n\n") +
         "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА БЕЗ ПАРАМЕТРОВ:") + "\n"
         f"    Синхронизация содержимого директорий  {AIRFLOW_DEPLOY_PATH}dags,  {AIRFLOW_DEPLOY_PATH}keytab,  {AIRFLOW_DEPLOY_PATH}scripts,\n"
@@ -586,9 +578,14 @@ def check_param_dir_key(
 
         for host in hosts:
             if path.count("/") > 1:
-                rsync_command = f'rsync {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
+                # Properly close quotes in --rsync-path argument
+                rsync_command = (
+                    f'rsync --checksum -rogp --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && exit 0" '
+                    f'{exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ '
+                    f'{host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
+                )
                 run_command_with_log(
-                    f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && {rsync_command}',
+                    rsync_command,
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
                 )
                 save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
@@ -967,10 +964,6 @@ def check_hashes(paths: list[str], hosts: list[str],
         if is_dir:
             src_hashes = get_dir_md5_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts)
         else:
-            # if any(src_full.endswith(ext) for ext in exclude_exts):
-            #     save_log(f"Файл {src_full} исключён из проверки md5-хэша из-за расширения", info_level=True)
-            #     continue
-            # else:
             rel = path
             src_hashes[rel] = md5(src_full)
 

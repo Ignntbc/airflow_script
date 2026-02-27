@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36" version="29.4.0">
   <diagram name="Страница — 1" id="SDIAaCDEVH3uNvns0K8F">
-    <mxGraphModel dx="207" dy="110" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4681" pageHeight="3300" math="0" shadow="0">
+    <mxGraphModel dx="2583" dy="1379" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4681" pageHeight="3300" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -309,7 +309,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="wDLn3DgsPPzMGX017_kS-112" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="Да" vertex="1">
-          <mxGeometry height="30" width="60" x="430" y="2310" as="geometry" />
+          <mxGeometry height="30" width="60" x="429" y="2290" as="geometry" />
         </mxCell>
         <mxCell id="wDLn3DgsPPzMGX017_kS-113" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="wDLn3DgsPPzMGX017_kS-107" value="">
           <mxGeometry height="50" relative="1" width="50" as="geometry">
@@ -349,9 +349,9 @@
         <mxCell id="wDLn3DgsPPzMGX017_kS-125" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;" value="">
           <mxGeometry height="50" relative="1" width="50" as="geometry">
             <Array as="points">
-              <mxPoint x="810" y="2320" />
+              <mxPoint x="820" y="2430" />
             </Array>
-            <mxPoint x="440" y="2320" as="sourcePoint" />
+            <mxPoint x="430" y="2430" as="sourcePoint" />
             <mxPoint x="816.71" y="385" as="targetPoint" />
           </mxGeometry>
         </mxCell>
@@ -361,7 +361,7 @@
               <mxPoint x="680" y="1900" />
             </Array>
             <mxPoint x="820" y="1760" as="sourcePoint" />
-            <mxPoint x="810" y="1900" as="targetPoint" />
+            <mxPoint x="820" y="1900" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="wDLn3DgsPPzMGX017_kS-128" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" value="">
@@ -391,7 +391,7 @@
         <mxCell id="wDLn3DgsPPzMGX017_kS-132" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" value="">
           <mxGeometry height="50" relative="1" width="50" as="geometry">
             <mxPoint x="469" y="1630" as="sourcePoint" />
-            <mxPoint x="810" y="1630" as="targetPoint" />
+            <mxPoint x="820" y="1630" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="wDLn3DgsPPzMGX017_kS-133" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="wDLn3DgsPPzMGX017_kS-46" value="">
