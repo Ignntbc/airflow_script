@@ -6,27 +6,33 @@ import sys
 import subprocess
 import socket
 import logging
-from typing import Optional
 from datetime import datetime
 from typing import List
 
 
+
 CRITICAL_DISK_USAGE_PERCENT = 80
+
 ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "-exclude"]
+
+
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogp --rsync-path="mkdir -p'
 RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogp --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogp'
 RSYNC_CHECKSUM = "rsync --checksum -rogp"
-CHOWN_STRING = "--chown={{ airflow_deploy_suz_account.user }}:{{ airflow_tuz_account.user }}"
+CHOWN_STRING = "--chown=airflow_deploy:airflow"
 CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
-AIRFLOW_PATH = "{{ airflow_dir.path }}/"
-AIRFLOW_DEPLOY_PATH = "{{ airflow_deploy_dir.path }}/"
-LOCAL_DEPLOY = "{{ airflow_deploy_suz_account.user }}@127.0.0.1"
-SSH_USER = "ssh {{ airflow_deploy_suz_account.user }}"
-CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo="
+AIRFLOW_PATH = "/app/airflow/"
+AIRFLOW_DEPLOY_PATH = "/app/airflow_deploy/"
+LOCAL_DEPLOY = "airflow_deploy@127.0.0.1"
+SSH_USER = "ssh airflow_deploy"
+CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo=" 
+# CHMOD_WITHOUT_DO_FU_DG_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=,Fu=,Fo="
+
 VERBOSE = "-v" in sys.argv
-LOCAL_TEST = False
-list_folders = ["dags", "csv", "jar", "keys", "keytab", "scripts", "user_data"]
+
+LOCAL_TEST = True
+list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 
 def is_dir_allowed(path: str) -> bool:
@@ -53,6 +59,7 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
         return False
     if ("--delete" in found or "--file" in found) and "-exclude" in keys:
         return False
+
     # Остальные ключи разрешены в любых сочетаниях
     return True
 
@@ -60,14 +67,14 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
 if LOCAL_TEST:
     description_path = "description.json"
 else:
-    description_path = "{{ description_dir.path }}/description.json"
+    description_path = "/app/app/etc/description.json"
 
 with open(description_path, "r", encoding="utf-8") as file_description:
     data_description = json.load(file_description)
 
 schedulers = data_description["software"]["app"]["nodes"]["airflow_scheduler"]
 webs = data_description["software"]["app"]["nodes"]["airflow_web"]
-workers = data_description["software"]["app"]["nodes"].get("airflow_workers",[])
+workers = data_description["software"]["app"]["nodes"]["airflow_workers"]
 all_hosts = schedulers + webs + workers + ["127.0.0.1"]
 
 EXECUTOR_TYPE = data_description["software"]["app"]["executor"]
@@ -82,8 +89,7 @@ def get_hosts() -> list:
         return ["127.0.0.1"]
     return all_hosts
 
-
-def log_exceptions(log_message: str, context_arg_name: Optional[str] = None):
+def log_exceptions(log_message: str, context_arg_name: str| None = None):
     """
     Декоратор для обработки исключений с информативным логированием.
     context_arg_name (str): имя аргумента функции, который будет включён в лог при ошибке.
@@ -109,8 +115,7 @@ def log_exceptions(log_message: str, context_arg_name: Optional[str] = None):
         return wrapper
     return decorator
 
-
-def check_configuration(executor_type: str) -> str:
+def check_configuratioon(executor_type: str) -> str:
     """
     Определяет тип конфигурации Airflow по типу executor.
 
@@ -126,12 +131,15 @@ def check_configuration(executor_type: str) -> str:
         config = "cluster"
     return config
 
-CONFIGURATION= check_configuration(EXECUTOR_TYPE)
-LOG_DIR = "{{ airflow_deploy_log_dir.path }}"
+CONFIGURATION= check_configuratioon(EXECUTOR_TYPE)
+
+
+LOG_DIR = '/app/airflow_deploy/log/'
 LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy.log')
 LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
 LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
-LOG_MAX_SIZE = 10 * 10 * 1024  # 10 МБ
+
+LOG_MAX_SIZE = 10 * 10 * 1024  # 10 МБ 
 
 
 def file_size(path):
@@ -142,7 +150,6 @@ def file_size(path):
     :return: Размер файла в байтах или 0, если файл не найден
     """
     return os.path.getsize(path) if os.path.exists(path) else 0
-
 
 @log_exceptions(log_message="Ошибка при ротации логов")
 def rotate_logs() -> None:
@@ -158,6 +165,8 @@ def rotate_logs() -> None:
         for i in range(len(log_files) - 1, 0, -1):
             if os.path.exists(log_files[i - 1]):
                 os.rename(log_files[i - 1], log_files[i])
+    
+
 
 
 def setup_logger() -> logging.Logger:
@@ -192,13 +201,11 @@ def setup_logger() -> logging.Logger:
 
 logger = setup_logger()
 
-
 def save_log(message: str,
             with_exit=False,
             info_level=False) -> None:
     """
-    Логирует сообщение через стандартный logger. 
-    Если with_exit=True, пишет как ошибку и завершает выполнение.
+    Логирует сообщение через стандартный logger. Если with_exit=True, пишет как ошибку и завершает выполнение.
 
     Аргументы:
     message: Сообщение для лога.
@@ -214,9 +221,8 @@ def save_log(message: str,
         if info_level:
             logger.info(message)
 
-
 @log_exceptions(log_message="Ошибка при определении имени пользователя")
-def check_real_user() -> Optional[str]:
+def check_real_user() -> str|None:
     """
     Определяет имя пользователя, под которым запущен скрипт (с учётом sudo).
 
@@ -255,6 +261,7 @@ real_name = check_real_user()
 current_hostname = socket.gethostname()
 
 
+
 def param_run_script(keys: list[str]) -> None:
     """
     Логирует запуск скрипта, дату и пользователя.
@@ -274,7 +281,7 @@ def param_run_script(keys: list[str]) -> None:
         if key == "-h":
             check_param_h_key()
             sys.exit(0)
-
+           
 
 def run_command_with_log(
     command: str,
@@ -316,7 +323,6 @@ def run_command_with_log(
         save_log("rsync error detected", with_exit=True)
 
     return stdout_decoded
-
 
 @log_exceptions(log_message="Ошибка при проверке прав доступа", context_arg_name="host")
 def check_permissions(host: str) -> None:
@@ -428,7 +434,7 @@ def check_param_file_key(
         save_log(f"Проверка наличия файла для деплоя: {airflow_deploy_dir_path}")
         if not os.path.exists(airflow_deploy_dir_path):
             save_log(f"Файл не найден для деплоя: {airflow_deploy_dir_path}", with_exit=True)
-
+        
         chmod_string = get_chmod_string(path)
         hosts = get_hosts()
         for host in hosts:
@@ -454,7 +460,7 @@ def check_param_file_key(
 
 
 @log_exceptions(log_message="Ошибка при удалении содержимого директории", context_arg_name="host_name")
-def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[str]] = None) -> None:
+def remote_delete_items(elem: str, host_name: str, exclude_exts: list[str]|list = []) -> None:
     """
     Удаляет все элементы в целевой директории на удалённом хосте.
     Для dags пропускает __pycache__, для остальных удаляет все элементы.
@@ -469,9 +475,7 @@ def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[s
     if elem == "dags":
         for item in items:
             ext = os.path.splitext(item)[1]
-            if "__pycache__" in item or ".pyc" in item:
-                continue
-            if exclude_exts and ext in exclude_exts:
+            if "__pycache__" in item or ".pyc" in item or ext in exclude_exts:
                 continue
             result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/{item}", f"Удаление: {AIRFLOW_PATH}dags/{item} на хосте {host_name}", info_level=True)
             save_log(f"Результат удаления {AIRFLOW_PATH}dags/{item} на хосте {host_name}: {result.strip()}", info_level=True)
@@ -482,9 +486,8 @@ def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[s
             result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rf {AIRFLOW_PATH}{elem}/{item}", f"Удаление: {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}", info_level=True)
             save_log(f"Результат удаления {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}: {result.strip()}", info_level=True)
 
-
 @log_exceptions(log_message="Ошибка при очистке целевых папок")
-def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None:
+def remove_destination_folders(exclude_exts: list[str]|list = []) -> None:
     """
     Удаляет содержимое целевых папок на удалённом сервере airflow_deploy через ssh.
     Для папки dags пропускает каталоги __pycache__, для остальных удаляет все элементы.
@@ -495,7 +498,7 @@ def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None
         save_log(f"Очистка на хосте: {host_name}", info_level=True)
         for elem in list_folders:
             remote_delete_items(elem, host_name, exclude_exts)
-
+    
     save_log("Очистка целевых папок на удалённых хостах завершена успешно", info_level=True)
 
     sys.exit(0)
@@ -509,7 +512,7 @@ def check_param_h_key() -> None:
         "\033[32m{}\033[0m".format("\nДОСТУПНЫЕ КЛЮЧИ: [-c], [-h], [--delete], [--file], [--dir]\n\n") +
         "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА БЕЗ ПАРАМЕТРОВ:") + "\n"
         f"    Синхронизация содержимого директорий  {AIRFLOW_DEPLOY_PATH}dags,  {AIRFLOW_DEPLOY_PATH}keytab,  {AIRFLOW_DEPLOY_PATH}scripts,\n"
-        f" {AIRFLOW_DEPLOY_PATH}keys,  {AIRFLOW_DEPLOY_PATH}csv,  {AIRFLOW_DEPLOY_PATH}jar,  {AIRFLOW_DEPLOY_PATH}user_data с соответствующими директориями в {{ airflow_dir.path }}\n"
+        f" {AIRFLOW_DEPLOY_PATH}keys,  {AIRFLOW_DEPLOY_PATH}csv,  {AIRFLOW_DEPLOY_PATH}jar,  {AIRFLOW_DEPLOY_PATH}user_data с соответствующими директориями в /app/airflow\n"
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh\n\n") +
         "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА С КЛЮЧОМ -c:") + "\n"
         f"    Производится очистка директории назначения ( {AIRFLOW_PATH}dags,  {AIRFLOW_PATH}keytab,  {AIRFLOW_PATH}scripts,)\n"
@@ -540,13 +543,16 @@ def check_param_h_key() -> None:
 
 
 @log_exceptions(log_message="Ошибка при деплое директорий")
-def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def check_param_dir_key(
+    paths: list[str],
+    exclude_exts: list[str]|list = []
+) -> None:
     """
     Универсальная функция деплоя директории на все хосты для one-way и cluster.
 
     Аргументы:
         paths (list[str]): Список путей к директориям для деплоя (относительно AIRFLOW_DEPLOY_PATH).
-        exclude_exts (Optional[list[str]]): Список расширений файлов для исключения из обработки.
+        exclude_exts (list[str]|list): Список расширений файлов для исключения из обработки.
 
     Не возвращает значения. В случае ошибки завершает выполнение скрипта.
     """
@@ -572,9 +578,13 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
 
         for host in hosts:
             if path.count("/") > 1:
-                rsync_command = f'rsync {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
+                rsync_command = (
+                    f'rsync --checksum -rogp --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
+                    f'{exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ '
+                    f'{host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
+                )
                 run_command_with_log(
-                    f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && {rsync_command}',
+                    rsync_command,
                     f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
                 )
                 save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
@@ -587,7 +597,7 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
 
 
 @log_exceptions(log_message="Ошибка при полной синхронизации папок", context_arg_name="folder")
-def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
+def check_full_sync(exclude_exts: list[str]|list = []) -> None:
     """
     Переносит все папки из list_folders с нужными chmod.
     Для keytab и keys используется CHMOD_WITHOUT_FU_FO_STRING,
@@ -616,8 +626,11 @@ def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
     save_log("Полная синхронизация всех папок завершена успешно", info_level=True)
 
 
+
 @log_exceptions(log_message="Ошибка при обработке параметров командной строки")
-def check_param_run(keys: list[str], paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def check_param_run(keys: list[str],
+                    paths: list[str],
+                    exclude_exts: list[str]|list = []) -> None:
     """
     Обрабатывает параметры командной строки для управления синхронизацией и удалением файлов/директорий Airflow.
     Аргументы:
@@ -639,12 +652,12 @@ def check_param_run(keys: list[str], paths: list[str], exclude_exts: Optional[li
         "--dir": lambda: check_param_dir_key(paths, exclude_exts),
         "-c":  lambda: remove_destination_folders(exclude_exts),
         "--dry-run": check_rsync_host,
-        "": lambda: check_full_sync(exclude_exts)
+        "": lambda: check_full_sync(exclude_exts),
     }
     if "--dry-run" in keys:
         check_rsync_host()
         keys.remove("--dry-run")
-
+        
     for key in keys:
         func = key_func_map.get(key)
         if func:
@@ -667,7 +680,7 @@ def check_files_in_dirs() -> None:
                 break
 
     if files_in_dirs <= 1:
-        save_log(f"{datetime.now()} {real_name} Ошибка !!! В прикладных директориях {{ airflow_deploy_dir.path }} (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса\n\n", with_exit=True)
+        save_log(f"{datetime.now()} {real_name} Ошибка !!! В прикладных директориях /app/airflow_deploy (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса\n\n", with_exit=True)
     else:
         save_log(f"Проверка наличия файлов для переноса завершена успешно. Найдено файлов/директорий: {files_in_dirs}")
 
@@ -698,7 +711,7 @@ def check_permission_type(
         log_prefix = "Проверка владельца:"
 
     save_log(f"{log_prefix} {cmd}")
-    for_result = run_command_with_log(cmd, f"Проверка {check_type} на хосте {host} для {folder}").strip().split("\n")
+    for_result = run_command_with_log(cmd, f"Проверка {check_type} на хосте {host} для {folder}").strip().split("\n") 
     for item in for_result:
         if len(item) > 2:
             perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {item}", f"Ошибка при проверке группы или пользователя на хосте {host} для {item}")
@@ -710,7 +723,7 @@ def check_permission_type(
         perm_cmd = f"{SSH_USER}@{host} find {folder} -type f ! -perm 0600"
     else:
         perm_cmd = f"{SSH_USER}@{host} find {folder} -type d ! -perm 0755 ! -perm 0775"
-
+    
     perm_error_prefix = f"Ошибка !!! Некорректные права для {folder} на хосте {host}"
 
     save_log(f"Проверка прав доступа: {perm_cmd}")
@@ -765,9 +778,9 @@ def connect_write(host: str) -> None:
 
 
 @log_exceptions("Ошибка при проверке свободного места на хосте", "data_host")
-def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def check_free_space(data_host: str, paths: list[str], exclude_exts: list[str]|list = []) -> None:
     """
-    Проверяет свободное место на разделе {{ app_dir.path }} удалённого хоста и предупреждает,
+    Проверяет свободное место на разделе /app удалённого хоста и предупреждает,
     если после деплоя занятое место превысит критический порог.
 
     Аргументы:
@@ -775,10 +788,10 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         paths (list[str]): Список путей (файлы/папки) для анализа размера.
         exclude_exts (list[str]): Список расширений для исключения из проверки.
     """
-    save_log(f"Запуск проверки свободного места на разделе {{ app_dir.path }} хоста: {data_host}")
+    save_log(f"Запуск проверки свободного места на разделе /app хоста: {data_host}")
     result_command = run_command_with_log(
-        f"{SSH_USER}@{data_host} df {{ app_dir.path }}  --output=avail,used | tail -n +2 | tr -d '%'",
-        f"Проверка свободного места на {{ app_dir.path }} хост {data_host}",
+        f"{SSH_USER}@{data_host} df /app  --output=avail,used | tail -n +2 | tr -d '%'",
+        f"Проверка свободного места на /app хост {data_host}",
         info_level=True
     )
     save_log(f"Результат команды df: '{result_command}'")
@@ -801,7 +814,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             if exclude_exts:
                 exclude_find = ' '.join([f'! -name "*{ext}"' for ext in exclude_exts])
                 size_cmd = f'find "{path}" -type f {exclude_find} -print0 | xargs -0 du -b | awk \'{{sum+=$1}} END {{print sum}}\''
-
+            
             local_size = int(subprocess.getoutput(size_cmd).strip())
             remote_cmd = f'{SSH_USER}@{data_host} "[ -d \"{path}\" ] && du -s \"{path}\" | cut -f1 || echo 0"'
 
@@ -811,7 +824,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
 
         else:
             save_log(f"Путь {path} не найден локально", with_exit=True)
-
+        
         remote_size_str = run_command_with_log(remote_cmd, f"Получение размера {path} на сервере {data_host}")
         try:
             remote_size = int(remote_size_str.strip())
@@ -832,7 +845,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
     total_used = used_server + used_deploy
     percent_used = (total_used / total) * 100
     if percent_used > CRITICAL_DISK_USAGE_PERCENT:
-        save_log(f"Прерывание деплоя из-за недостаточного свободного места : после деплоя будет занято {percent_used:.2f}% дискового пространства на {{ app_dir.path }} хоста {data_host}", with_exit=True)
+        save_log(f"Прерывание деплоя из-за недостаточного свободного места : после деплоя будет занято {percent_used:.2f}% дискового пространства на /app хоста {data_host}", with_exit=True)
     else:
         save_log(f"Проверка свободного места на хосте {data_host} завершена успешно. После деплоя будет занято {percent_used:.2f}% дискового пространства", info_level=True)
 
@@ -874,7 +887,7 @@ def path_sum_files() -> dict[str, str]:
     return path_sum
 
 
-def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: Optional[list[str]] = None) -> dict:
+def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: list[str]|list = []) -> dict:
     """
     Возвращает словарь md5-хэшей для всех файлов в директории root_dir относительно base_dir.
     :param base_dir: Базовая директория для относительных путей.
@@ -892,7 +905,6 @@ def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: Optional[list
             hashes[rel] = md5(abs_path)
 
     return hashes
-
 
 def get_remote_md5_hashes(host: str, path: str, is_dir: bool) -> dict:
     """
@@ -930,7 +942,8 @@ def get_remote_md5_hashes(host: str, path: str, is_dir: bool) -> dict:
 
 
 @log_exceptions("Ошибка при проверке md5-хэшей между источником и целями")
-def check_hashes(paths: list[str], hosts: list[str], exclude_exts: Optional[list[str]] = None) -> bool:
+def check_hashes(paths: list[str], hosts: list[str],
+                 exclude_exts: list[str]|list = []) -> bool:
     """
     Сравнивает md5-хэши между источником и целями.
 
@@ -953,7 +966,7 @@ def check_hashes(paths: list[str], hosts: list[str], exclude_exts: Optional[list
             rel = path
             src_hashes[rel] = md5(src_full)
 
-
+        
         for host in hosts:
             dst_hashes = get_remote_md5_hashes(host, path, is_dir)
             for rel, src_md5 in src_hashes.items():
@@ -962,6 +975,7 @@ def check_hashes(paths: list[str], hosts: list[str], exclude_exts: Optional[list
                     save_log(f"Несовпадение md5 для {rel} на {host}: src={src_md5}, dst={dst_md5}", info_level=True)
                     all_ok = False
                     return all_ok
+        
     return all_ok
 
 
@@ -970,7 +984,7 @@ def check_rsync_host() -> None:
     Проверяет возможность синхронизации директорий с помощью rsync на указанный хост.
     """
     hosts = get_hosts()
-
+    
     for host_name in hosts:
         save_log(f"Запуск проверки запуска rsync на хосте: {host_name}")
         for folder in list_folders:
@@ -983,7 +997,7 @@ def check_rsync_host() -> None:
                 save_log(f"Ошибка при dry-run rsync для директории {folder} на хосте {host_name}: {str(e)}", with_exit=True)
 
 
-def host_checks(hostname: str, paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = []) -> None:
     """
     Выполняет все проверки для одного хоста:
     - Проверка доступности (ping)
@@ -1055,12 +1069,14 @@ def main() -> None:
     key_allowed = is_key_combination_allowed(keys)
     if not key_allowed:
         save_log(f"Ошибка: недопустимая комбинация ключей: {keys}", with_exit=True)
-
+    
     for path in paths:
         dir_allowed = is_dir_allowed(path)
         if not dir_allowed:
             save_log(f"Ошибка: недопустимый путь для синхронизации: {path}", with_exit=True)
-
+    
+    # for check_folder, check_extension in ext_map.items():
+    #     check_type_file(check_folder, check_extension)
 
     param_run_script(keys)
     check_files_in_dirs()
@@ -1070,6 +1086,11 @@ def main() -> None:
 
 
     if CONFIGURATION == "cluster":
+        # processes = [Process(target=host_checks, args=(hostname, paths)) for hostname in all_hosts]
+        # for p in processes:
+        #     p.start()
+        # for p in processes:
+        #     p.join()
         for hostname in all_hosts:
             host_checks(hostname, paths, exclude_exts)
 
@@ -1078,7 +1099,7 @@ def main() -> None:
     ok_status = check_hashes(paths, hosts, exclude_exts)
     if not ok_status:
         save_log("Ошибка: md5-хэши не совпали после синхронизации", with_exit=True)
-
+    
     save_log(f"Синхронизация завершена успешно для {hosts} хостов")
 
     sys.exit(0)
