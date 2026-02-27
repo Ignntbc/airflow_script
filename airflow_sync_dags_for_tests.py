@@ -813,7 +813,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: list[str]|l
             size_cmd = f'du -s "{path}" | cut -f1'
             if exclude_exts:
                 exclude_find = ' '.join([f'! -name "*{ext}"' for ext in exclude_exts])
-                size_cmd = f'find "{path}" -type f {exclude_find} -print0 | xargs -0 du -b | awk \'sum+=$1; END {{print sum}}\''
+                size_cmd = f'find "{path}" -type f {exclude_find} -print0 | xargs -0 du -b | awk "sum+=$1; END print sum"'
             
             local_size = int(subprocess.getoutput(size_cmd).strip())
             remote_cmd = f'{SSH_USER}@{data_host} "[ -d \"{path}\" ] && du -s \"{path}\" | cut -f1 || echo 0"'
