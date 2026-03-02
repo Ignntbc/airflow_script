@@ -481,14 +481,17 @@ def remote_update_items(elem: str, host_name: str, exclude_exts: list[str]|list 
         )
         result = run_command_with_log(rsync_cmd, f"Копирование с заменой: {src_dir} -> {dst_dir} на хосте {host_name}", info_level=True)
         save_log(f"Результат копирования {src_dir} -> {dst_dir} на хосте {host_name}: {result.strip()}", info_level=True)
-        # Копируем SQL-файлы
+        
         src_sql = f"{AIRFLOW_DEPLOY_PATH}dags/sql"
         dst_sql = f"{AIRFLOW_PATH}dags/sql"
-        rsync_sql_cmd = (
-            f"rsync --checksum -rogp {CHOWN_STRING} {chmod_string} {src_sql}/ {host_prefix}{dst_sql}"
-        )
-        result_sql = run_command_with_log(rsync_sql_cmd, f"Копирование SQL-файлов: {src_sql} -> {dst_sql} на хосте {host_name}", info_level=True)
-        save_log(f"Результат копирования SQL-файлов на хосте {host_name}: {result_sql.strip()}", info_level=True)
+        if os.path.exists(src_sql):
+            rsync_sql_cmd = (
+                f"rsync --checksum -rogp {CHOWN_STRING} {chmod_string} {src_sql}/ {host_prefix}{dst_sql}"
+            )
+            result_sql = run_command_with_log(rsync_sql_cmd, f"Копирование SQL-файлов: {src_sql} -> {dst_sql} на хосте {host_name}", info_level=True)
+            save_log(f"Результат копирования SQL-файлов на хосте {host_name}: {result_sql.strip()}", info_level=True)
+        else:
+            save_log(f"Директория {src_sql} не найдена, копирование SQL-файлов пропущено", info_level=True)
     else:
         # Копируем все кроме exclude_exts
         rsync_cmd = (
