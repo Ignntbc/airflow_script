@@ -7,7 +7,7 @@ import subprocess
 import socket
 import logging
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 
 
@@ -460,7 +460,7 @@ def check_param_file_key(
 
 
 @log_exceptions(log_message="Ошибка при обновлении содержимого директории", context_arg_name="host_name")
-def remote_update_items(elem: str, host_name: str, exclude_exts: list[str]|list = []) -> None:
+def remote_update_items(elem: str, host_name: str, exclude_exts: Optional[list[str]] = None) -> None:
     """
     Копирует с заменой все файлы из основной директории на сервер, исключая __pycache__ и указанные расширения.
     Для dags пропускает __pycache__, .pyc и exclude_exts.
@@ -493,7 +493,6 @@ def remote_update_items(elem: str, host_name: str, exclude_exts: list[str]|list 
         else:
             save_log(f"Директория {src_sql} не найдена, копирование SQL-файлов пропущено", info_level=True)
     else:
-        # Копируем все кроме exclude_exts
         rsync_cmd = (
             f"rsync --checksum -rogp {exclude_args} {CHOWN_STRING} {chmod_string} "
             f"{src_dir}/ {host_prefix}{dst_dir}"
@@ -502,7 +501,7 @@ def remote_update_items(elem: str, host_name: str, exclude_exts: list[str]|list 
         save_log(f"Результат копирования {src_dir} -> {dst_dir} на хосте {host_name}: {result.strip()}", info_level=True)
 
 @log_exceptions(log_message="Ошибка при обновлении целевых папок")
-def update_destination_folders(exclude_exts: list[str]|list = []) -> None:
+def update_destination_folders(exclude_exts: Optional[list[str]] = None) -> None:
     """
     Копирует с заменой все файлы из основной директории на сервер для всех целевых папок.
     Для dags пропускает каталоги __pycache__, .pyc и exclude_exts.
