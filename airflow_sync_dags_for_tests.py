@@ -817,13 +817,16 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             remote_find_cmd = (
                 SSH_USER + "@" + data_host +
                 " 'find " + path +
-                " -type f -exec stat -c %s {} \\; 2>/dev/null | awk 'sum+=$1 END {print sum}''"
+                " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
             )
-            remote_size_str = get_stdout_from_cmd(remote_find_cmd)
-            try:
-                remote_size = int(remote_size_str.strip())
-            except Exception:
-                remote_size = 0
+            remote_out = get_stdout_from_cmd(remote_find_cmd)
+            remote_size = 0
+            for line in remote_out.splitlines():
+                try:
+                    _, size = line.strip().rsplit(' ', 1)
+                    remote_size += int(size)
+                except Exception:
+                    continue
             mb = remote_size // 1024 // 1024
             freed_by_delete += mb
             save_log(f"Удаление {path} освободит {mb} mb на сервере {data_host}", info_level=True)
@@ -844,13 +847,13 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             remote_find_cmd = (
                 SSH_USER + "@" + data_host +
                 " 'find " + AIRFLOW_PATH +
-                " -type f -exec stat -c %n %s {} \\; 2>/dev/null'"
+                " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
             )
             remote_files = {}
             remote_out = get_stdout_from_cmd(remote_find_cmd)
             for line in remote_out.splitlines():
                 try:
-                    rel, sz = line.strip().split()
+                    rel, sz = line.strip().rsplit(' ', 1)
                     rel = os.path.relpath(rel, AIRFLOW_PATH)
                     remote_files[rel] = int(sz)
                 except Exception:
