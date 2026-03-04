@@ -1014,7 +1014,7 @@ def check_rsync_host() -> None:
                 chmod_string = get_chmod_string(folder)
                 command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}"
                 run_command_with_log(command, f"Проверка dry-run rsync для {folder} на хосте {host_name}", rsync_error=True)
-                save_log(f"Dry-run rsync для директории {folder} на хосте {host_name} выполнен успешно")
+                save_log(f"Dry-run rsync для директории {folder} на хосте {host_name} выполнен успешно", info_level=True)
             except Exception as e:
                 save_log(f"Ошибка при dry-run rsync для директории {folder} на хосте {host_name}: {str(e)}", with_exit=True)
 
