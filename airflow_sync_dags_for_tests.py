@@ -1085,6 +1085,8 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         for folder in list_folders:
             paths.append(f"{folder}")
 
+    print(f"Parsed keys: {keys}")
+    print(f"Parsed paths: {paths}")
     elif keys == ["--dry-run"]:
         for folder in list_folders:
             paths.append(f"{folder}")
