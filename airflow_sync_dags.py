@@ -1108,9 +1108,10 @@ def main() -> None:
 
 
     check_param_run(keys, paths, exclude_exts)
-    ok_status = check_hashes(paths, hosts, exclude_exts)
-    if not ok_status:
-        save_log("Ошибка: md5-хэши не совпали после синхронизации", with_exit=True)
+    if any(key in keys for key in ["--dir", "--file", "-c", ""]):
+        ok_status = check_hashes(paths, hosts, exclude_exts)
+        if not ok_status:
+            save_log("Ошибка: md5-хэши не совпали после синхронизации", with_exit=True)
 
     save_log(f"Синхронизация завершена успешно для {hosts} хостов")
 
