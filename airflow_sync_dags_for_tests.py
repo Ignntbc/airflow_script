@@ -75,7 +75,7 @@ with open(description_path, "r", encoding="utf-8") as file_description:
 schedulers = data_description["software"]["app"]["nodes"]["airflow_scheduler"]
 webs = data_description["software"]["app"]["nodes"]["airflow_web"]
 workers = data_description["software"]["app"]["nodes"]["airflow_workers"]
-all_hosts = schedulers + webs + workers + ["127.0.0.1"]
+all_hosts = schedulers + webs + workers# + ["127.0.0.1"]
 
 EXECUTOR_TYPE = data_description["software"]["app"]["executor"]
 
