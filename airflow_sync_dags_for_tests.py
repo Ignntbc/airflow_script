@@ -1023,7 +1023,7 @@ def check_rsync_host() -> None:
                 save_log(f"Ошибка при dry-run rsync для директории {folder} на хосте {host_name}: {str(e)}", with_exit=True)
 
 
-def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = []) -> None:
+def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = [], keys: Optional[list[str]] = None) -> None:
     """
     Выполняет все проверки для одного хоста:
     - Проверка доступности (ping)
@@ -1035,9 +1035,14 @@ def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = 
         hostname (str): Имя или адрес хоста для проверки.
         paths (list[str]): Список путей для проверки свободного места.
         exclude_exts (list[str]): Список расширений для исключения из проверки.
+        keys (Optional[list[str]]): Список ключей для определения действий (например, --delete).
     """
+    action = 'push'
+    if keys:
+        if "--delete" in keys:
+            action = 'delete'
     connect_write(hostname)
-    check_free_space(hostname, paths, exclude_exts)
+    check_free_space(hostname, paths, exclude_exts, action=action)
     check_permissions(hostname)
     check_groups_users(hostname)
 
@@ -1110,7 +1115,7 @@ def main() -> None:
     check_files_in_dirs()
     hosts = get_hosts()
     if CONFIGURATION == "one-way":
-        host_checks(current_hostname, paths, exclude_exts)
+        host_checks(current_hostname, paths, exclude_exts, keys)
 
 
     if CONFIGURATION == "cluster":
@@ -1120,7 +1125,7 @@ def main() -> None:
         # for p in processes:
         #     p.join()
         for hostname in all_hosts:
-            host_checks(hostname, paths, exclude_exts)
+            host_checks(hostname, paths, exclude_exts, keys)
 
 
     check_param_run(keys, paths, exclude_exts)
