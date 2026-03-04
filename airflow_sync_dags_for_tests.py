@@ -817,10 +817,11 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         for path in full_paths:
         # Для удаления: считаем размер файлов/директорий, которые будут удалены на сервере
         # Получаем список файлов на сервере
+            rel_path = os.path.relpath(path, AIRFLOW_DEPLOY_PATH)
             remote_find_cmd = (
-                SSH_USER + "@" + data_host +
-                " 'find " + path +
-                " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
+                "ssh " + SSH_USER + "@" + data_host +
+                " 'find " + AIRFLOW_PATH + rel_path +
+                " -type f -exec stat -c \"%s\" {} \\; 2>/dev/null'"
             )
             remote_out = get_stdout_from_cmd(remote_find_cmd)
             remote_size = 0
