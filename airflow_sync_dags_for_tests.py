@@ -13,7 +13,7 @@ from typing import List, Optional
 
 CRITICAL_DISK_USAGE_PERCENT = 80
 
-ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "-exclude"]
+ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude"]
 
 
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogp --rsync-path="mkdir -p'
@@ -57,7 +57,7 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     # Если найдено больше одного конфликтного ключа — запрещено
     if len(found) > 1:
         return False
-    if ("--delete" in found or "--file" in found) and "-exclude" in keys:
+    if ("--delete" in found or "--file" in found) and "--exclude" in keys:
         return False
 
     # Остальные ключи разрешены в любых сочетаниях
@@ -1048,7 +1048,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         if skip_next:
             skip_next = False
             continue
-        if arg == "-exclude":
+        if arg == "--exclude":
             # Следующий аргумент — строка расширений через запятую
             if i + 2 <= len(script_args):
                 exts = script_args[i + 2].split(",")
@@ -1056,14 +1056,14 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
                 save_log(f"Добавлены расширения для исключения: {exclude_exts}", info_level=True)
                 skip_next = True
             else:
-                save_log("Ошибка: ключ -exclude требует аргумент со списком расширений через запятую", with_exit=True)
+                save_log("Ошибка: ключ --exclude требует аргумент со списком расширений через запятую", with_exit=True)
 
         elif arg.startswith('-'):
             keys.append(arg)
         else:
             paths.append(f"{arg}")
 
-    if set(keys) <= {"-v", "-exclude"}:
+    if set(keys) <= {"-v", "--exclude"}:
         keys.append("")
         for folder in list_folders:
             paths.append(f"{folder}")

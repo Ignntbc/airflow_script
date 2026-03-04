@@ -68,7 +68,7 @@ with open(description_path, "r", encoding="utf-8") as file_description:
 schedulers = data_description["software"]["app"]["nodes"]["airflow_scheduler"]
 webs = data_description["software"]["app"]["nodes"]["airflow_web"]
 workers = data_description["software"]["app"]["nodes"].get("airflow_workers",[])
-all_hosts = schedulers + webs + workers + ["127.0.0.1"]
+all_hosts = schedulers + webs + workers #+ ["127.0.0.1"]
 
 EXECUTOR_TYPE = data_description["software"]["app"]["executor"]
 
@@ -270,7 +270,7 @@ def param_run_script(keys: list[str]) -> None:
     save_log(f"{current_datetime} {real_name} Запуск скрипта с ключами: {keys}")
     for key in keys:
         if key not in ALL_KEYS:
-            save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {keys}\n\n", with_exit=True)
+            save_log(f"{current_datetime} {real_name} Неизвестный ключ/и {keys}", with_exit=True)
         if key == "-h":
             check_param_h_key()
             sys.exit(0)
@@ -374,7 +374,7 @@ def check_param_delete_key(
     current_datetime = datetime.now()
     missing = [f"{AIRFLOW_PATH}{x}" for x in paths if not os.path.exists(f"{AIRFLOW_PATH}{x}")]
     if missing:
-        save_log(f"{current_datetime} {real_name} Нет такого файла или директории {', '.join(missing)}\n\n", with_exit=True)
+        save_log(f"{current_datetime} {real_name} Нет такого файла или директории {', '.join(missing)}", with_exit=True)
 
     for i_script_args in paths:
         path = f"{AIRFLOW_PATH}{i_script_args}"
@@ -387,14 +387,14 @@ def check_param_delete_key(
                     shutil.rmtree(path)
                     save_log(f"Удалена директория: {path}", info_level=True)
             except Exception as e:
-                save_log(f"{current_datetime} {real_name} Ошибка при удалении {path}: {str(e)}\n\n", with_exit=True)
+                save_log(f"{current_datetime} {real_name} Ошибка при удалении {path}: {str(e)}", with_exit=True)
         else:
             for host in all_hosts:
                 try:
                     run_command_with_log(f"{SSH_USER}@{host} rm -rf {path}", f"Удаление файла/директории: {path} на хосте {host}")
                     save_log(f"Удалён файл/директория: {path} на хосте {host}", info_level=True)
                 except Exception as e:
-                    save_log(f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}\n\n", with_exit=True)
+                    save_log(f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}", with_exit=True)
 
     save_log("Удаление файлов/директорий завершено успешно", info_level=True)
     sys.exit(0)
@@ -542,7 +542,10 @@ def check_param_h_key() -> None:
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --dry-run\n\n") +
         "\033[32m{}\033[0m".format("Запуск скрипта с ключом -v:") + "\n"
         "    Включает подробный (verbose) режим вывода. Скрипт будет выводить дополнительную отладочную информацию о выполняемых действиях и командах.\n"
-        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n")
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --exclude:") + "\n"
+        "    Исключает указанные файлы или директории из синхронизации.\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --exclude dags/test.py\n\n")
     )
     print(help_text)
     sys.exit(0)
@@ -566,7 +569,7 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{path}"
         save_log(f"{current_datetime} {real_name} Проверка наличия директории для деплоя: {airflow_deploy_dir_path}")
         if not os.path.exists(airflow_deploy_dir_path):
-            save_log(f"{current_datetime} {real_name} Директория не найдена {airflow_deploy_dir_path} \n\n",
+            save_log(f"{current_datetime} {real_name} Директория не найдена {airflow_deploy_dir_path}",
                     with_exit=True)
 
         hosts = get_hosts()
@@ -588,15 +591,15 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
                 )
                 run_command_with_log(
                     rsync_command,
-                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}",
                 )
-                save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
+                save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}", info_level=True)
             else:
                 run_command_with_log(
                     f"{RSYNC_CHECKSUM} {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}",
-                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}",
                 )
-                save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
+                save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}", info_level=True)
 
 
 @log_exceptions(log_message="Ошибка при полной синхронизации папок", context_arg_name="folder")
@@ -680,7 +683,7 @@ def check_files_in_dirs() -> None:
                 break
 
     if files_in_dirs <= 1:
-        save_log(f"{datetime.now()} {real_name} Ошибка !!! В прикладных директориях {{ airflow_deploy_dir.path }} (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса\n\n", with_exit=True)
+        save_log(f"{datetime.now()} {real_name} Ошибка !!! В прикладных директориях {{ airflow_deploy_dir.path }} (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса", with_exit=True)
     else:
         save_log(f"Проверка наличия файлов для переноса завершена успешно. Найдено файлов/директорий: {files_in_dirs}")
 

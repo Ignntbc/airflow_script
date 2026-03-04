@@ -16,7 +16,7 @@ sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh
 Запуск напрямую (без оболочки):
 sudo -u airflow_deploy python3 /app/airflow_deploy/airflow_sync_dags.py [опции]
 
-Usage: airflow_sync_dags.sh [-c] [-h] [-v] [--dry-run] [--delete] [--file] [--dir] [-exclude]
+Usage: airflow_sync_dags.sh [-c] [-h] [-v] [--dry-run] [--delete] [--file] [--dir] [--exclude]
 
 
 Описание ключей:
@@ -27,7 +27,7 @@ Usage: airflow_sync_dags.sh [-c] [-h] [-v] [--dry-run] [--delete] [--file] [--di
 -h         Вывести справку по использованию скрипта.
 -v         Включить подробный (verbose) режим вывода.
 --dry-run  Выполнить пробный запуск без фактической синхронизации файлов.
--exclude  Исключить из операций файлы с указанными расширениями (через запятую, например: .log,.tmp)
+--exclude  Исключить из операций файлы с указанными расширениями (через запятую, например: .log,.tmp)
 
 Примеры:
 sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh --dry-run
