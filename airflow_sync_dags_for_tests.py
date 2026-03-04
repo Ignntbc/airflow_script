@@ -810,6 +810,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
     freed_by_delete = 0
 
     full_paths = [f"{AIRFLOW_DEPLOY_PATH}{path}" for path in paths]
+    mb = 0
     for path in full_paths:
         if action == 'delete':
             # Для удаления: считаем размер файлов/директорий, которые будут удалены на сервере
@@ -852,11 +853,13 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             remote_files = {}
             remote_out = get_stdout_from_cmd(remote_find_cmd)
             for line in remote_out.splitlines():
+                print(f"DEBUG: processing remote line: {line}")
                 try:
                     rel, sz = line.strip().rsplit(' ', 1)
                     rel = os.path.relpath(rel, AIRFLOW_PATH)
                     remote_files[rel] = int(sz)
                 except Exception:
+                    save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
                     continue
             
             print(f"DEBUG: local_files={local_files}")
@@ -871,7 +874,8 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             # Для новых файлов (которых нет на сервере) — учитывается полный размер
             # Для файлов, которые уменьшатся — учитывается только разница
             mb = used_deploy / 1024 / 1024
-            save_log(f"После деплоя {path} потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
+
+    save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
 
 
 @log_exceptions("Ошибка при вычислении MD5-хеша для файла", "fname")
