@@ -827,9 +827,9 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
                     remote_size += int(size)
                 except Exception:
                     continue
-            mb = remote_size // 1024 // 1024
+            mb = remote_size / 1024 / 1024
             freed_by_delete += mb
-            save_log(f"Удаление {path} освободит {mb} mb на сервере {data_host}", info_level=True)
+            save_log(f"Удаление {path} освободит {mb:.3f} mb на сервере {data_host}", info_level=True)
         else:
             # Для деплоя: сравниваем пофайлово локальные и серверные размеры
             local_files = {}
@@ -870,8 +870,8 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             print(f"DEBUG: used_deploy={used_deploy} bytes")
             # Для новых файлов (которых нет на сервере) — учитывается полный размер
             # Для файлов, которые уменьшатся — учитывается только разница
-            mb = used_deploy // 1024 // 1024
-            save_log(f"После деплоя {path} потребуется дополнительно {mb} mb на сервере {data_host}", info_level=True)
+            mb = used_deploy / 1024 / 1024
+            save_log(f"После деплоя {path} потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
 
 
 @log_exceptions("Ошибка при вычислении MD5-хеша для файла", "fname")
