@@ -784,6 +784,7 @@ def get_stdout_from_cmd(cmd: str) -> str:
     """Выполняет shell-команду и возвращает stdout как строку (без лишних пробелов)."""
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
     if result.returncode != 0:
+        save_log(f"[get_stdout_from_cmd] Ошибка выполнения команды: {cmd}\nStderr: {result.stderr.strip()}", with_exit=True)
         raise RuntimeError(f"Ошибка выполнения команды: {cmd}\nStderr: {result.stderr.strip()}")
     return result.stdout.strip()
 
@@ -797,6 +798,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         data_host (str): Имя или адрес хоста для проверки.
         paths (list[str]): Список путей (файлы/папки) для анализа размера.
         exclude_exts (list[str]): Список расширений для исключения из проверки.
+        action (Literal['push', 'delete']): Тип действия для оценки - 'push' для деплоя, 'delete' для удаления.
     """
     used_deploy = 0
     freed_by_delete = 0
@@ -805,19 +807,18 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
     mb = 0
     if action == 'delete':
         for path in full_paths:
-        # Для удаления: считаем размер файлов/директорий, которые будут удалены на сервере
-        # Получаем список файлов на сервере
+            rel_path = os.path.relpath(path, AIRFLOW_DEPLOY_PATH)
             remote_find_cmd = (
                 SSH_USER + "@" + data_host +
-                " 'find " + path +
-                " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
+                " 'find " + AIRFLOW_PATH + rel_path +
+                " -type f -exec stat -c \"%s\" {} \\; 2>/dev/null'"
             )
             remote_out = get_stdout_from_cmd(remote_find_cmd)
             remote_size = 0
             for line in remote_out.splitlines():
                 try:
-                    _, size = line.strip().rsplit(' ', 1)
-                    remote_size += int(size)
+                    size = int(line.strip())
+                    remote_size += size
                 except Exception:
                     continue
             mb = remote_size / 1024 / 1024
@@ -865,75 +866,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         print(f"DEBUG: used_deploy={used_deploy} bytes")
         mb = used_deploy / 1024 / 1024
 
-    save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
-    # result_command = run_command_with_log(
-    #     f"{SSH_USER}@{data_host} df {{ app_dir.path }}  --output=avail,used | tail -n +2 | tr -d '%'",
-    #     f"Проверка свободного места на {{ app_dir.path }} хост {data_host}",
-    #     info_level=True
-    # )
-    # save_log(f"Результат команды df: '{result_command}'")
-    # parts = result_command.split()
-    # if len(parts) < 2:
-    #     save_log(f"Ошибка: некорректный вывод df: '{result_command}'", with_exit=True)
-    #     return
-
-    # free_disk_space = int(parts[0])
-    # used_server = int(parts[1])
-    # total = free_disk_space + used_server
-    # used_deploy = 0
-    # local_size = 0
-    # remote_cmd = ""
-
-    # full_paths =[f"{AIRFLOW_DEPLOY_PATH}{path}" for path in paths]
-    # if action == 'push':
-    #     save_log(f"Проверка размера файлов/директорий для деплоя: {full_paths} на хосте {data_host}", info_level=True)
-    #     for path in full_paths:
-    #         if os.path.isdir(path):
-    #             if exclude_exts:
-    #                 total_size = 0
-    #                 for root, _, files in os.walk(path):
-    #                     for file in files:
-    #                         if not any(file.endswith(ext) for ext in exclude_exts):
-    #                             try:
-    #                                 total_size += os.path.getsize(os.path.join(root, file))
-    #                             except Exception:
-    #                                 pass
-    #                 local_size = total_size
-    #             else:
-    #                 size_cmd = f'du -s "{path}" | cut -f1'
-    #                 local_size = int(subprocess.getoutput(size_cmd).strip())
-    #             remote_cmd = f'{SSH_USER}@{data_host} "[ -d \"{path}\" ] && du -s \"{path}\" | cut -f1 || echo 0"'
-
-    #         elif os.path.isfile(path):
-    #             local_size = os.path.getsize(path)
-    #             remote_cmd = f'{SSH_USER}@{data_host} "[ -f \"{path}\" ] && stat -c %s \"{path}\" || echo 0"'
-
-    #         else:
-    #             save_log(f"Путь {path} не найден локально", with_exit=True)
-
-    #         remote_size_str = run_command_with_log(remote_cmd, f"Получение размера {path} на сервере {data_host}")
-    #         try:
-    #             remote_size = int(remote_size_str.strip())
-    #         except Exception:
-    #             remote_size = 0
-
-    #         diff = local_size - remote_size
-    #         mb = abs(diff) // 1024 // 1024
-    #         used_deploy += mb
-
-    #         if diff > 0:
-    #             save_log(f"После деплоя {path} займет дополнительно {mb} mb", info_level=True)
-    #         elif diff < 0:
-    #             save_log(f"После деплоя {path} освободит дополнительно {mb} mb", info_level=True)
-    #         else:
-    #             save_log(f"После деплоя {path} не изменит занимаемое место", info_level=True)
-
-    #     total_used = used_server + used_deploy
-    #     percent_used = (total_used / total) * 100
-    #     if percent_used > CRITICAL_DISK_USAGE_PERCENT:
-    #         save_log(f"Прерывание деплоя из-за недостаточного свободного места : после деплоя будет занято {percent_used:.2f}% дискового пространства на {{ app_dir.path }} хоста {data_host}", with_exit=True)
-    #     else:
-    #         save_log(f"Проверка свободного места на хосте {data_host} завершена успешно. После деплоя будет занято {percent_used:.2f}% дискового пространства", info_level=True)
+        save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
 
 
 @log_exceptions("Ошибка при вычислении MD5-хеша для файла", "fname")

@@ -876,7 +876,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         print(f"DEBUG: used_deploy={used_deploy} bytes")
         mb = used_deploy / 1024 / 1024
 
-    save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
+        save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
 
 
 @log_exceptions("Ошибка при вычислении MD5-хеша для файла", "fname")
