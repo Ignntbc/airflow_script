@@ -1079,18 +1079,18 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         else:
             paths.append(f"{arg}")
             i += 1
-
+    
     if set(keys) <= {"-v", "--exclude"}:
         keys.append("")
         for folder in list_folders:
             paths.append(f"{folder}")
 
-    print(f"Parsed keys: {keys}")
-    print(f"Parsed paths: {paths}")
+    
     elif keys == ["--dry-run"]:
         for folder in list_folders:
             paths.append(f"{folder}")
-
+    print(f"Parsed keys: {keys}")
+    print(f"Parsed paths: {paths}")
     return paths, keys, exclude_exts
 
 
