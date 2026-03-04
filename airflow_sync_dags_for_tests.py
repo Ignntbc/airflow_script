@@ -855,12 +855,16 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
                     remote_files[rel] = int(sz)
                 except Exception:
                     continue
+            
+            print(f"DEBUG: local_files={local_files}")
+            print(f"DEBUG: remote_files={remote_files}")
             # Считаем разницу по каждому локальному файлу
             for rel, lsz in local_files.items():
                 rsz = remote_files.get(rel, 0)
                 diff = lsz - rsz
                 if diff > 0:
                     used_deploy += diff
+            print(f"DEBUG: used_deploy={used_deploy} bytes")
             # Для новых файлов (которых нет на сервере) — учитывается полный размер
             # Для файлов, которые уменьшатся — учитывается только разница
             mb = used_deploy // 1024 // 1024
