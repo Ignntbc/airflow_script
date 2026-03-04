@@ -545,7 +545,7 @@ def check_param_h_key() -> None:
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n") +
         "\033[32m{}\033[0m".format("Запуск скрипта с ключом --exclude:") + "\n"
         "    Исключает указанные файлы или директории из синхронизации.\n"
-        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --exclude dags/test.py\n\n")
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --exclude .tmp,txt\n\n")
     )
     print(help_text)
     sys.exit(0)
@@ -1033,25 +1033,27 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
     keys = []
     paths = []
     exclude_exts = []
-    skip_next = False
-    for i, arg in enumerate(script_args[1:]):
-        if skip_next:
-            skip_next = False
-            continue
+    i = 1
+    argc = len(script_args)
+    while i < argc:
+        arg = script_args[i]
         if arg == "--exclude":
-            # Следующий аргумент — строка расширений через запятую
-            if i + 2 <= len(script_args):
-                exts = script_args[i + 2].split(",")
-                exclude_exts.extend([e if e.startswith(".") else f".{e}" for e in exts])
+            if i + 1 < argc and not script_args[i + 1].startswith('-'):
+                exts = script_args[i + 1].split(",")
+                for e in exts:
+                    e = e.strip()
+                    if e and not e.startswith('-'):
+                        exclude_exts.append(e if e.startswith(".") else f".{e}")
                 save_log(f"Добавлены расширения для исключения: {exclude_exts}", info_level=True)
-                skip_next = True
+                i += 2
             else:
                 save_log("Ошибка: ключ --exclude требует аргумент со списком расширений через запятую", with_exit=True)
-
         elif arg.startswith('-'):
             keys.append(arg)
+            i += 1
         else:
             paths.append(f"{arg}")
+            i += 1
 
     if set(keys) <= {"-v", "--exclude"}:
         keys.append("")
