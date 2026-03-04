@@ -792,6 +792,7 @@ def get_stdout_from_cmd(cmd: str) -> str:
     """Выполняет shell-команду и возвращает stdout как строку (без лишних пробелов)."""
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
     if result.returncode != 0:
+        save_log(f"[get_stdout_from_cmd] Ошибка выполнения команды: {cmd}\nStderr: {result.stderr.strip()}", with_exit=True)
         raise RuntimeError(f"Ошибка выполнения команды: {cmd}\nStderr: {result.stderr.strip()}")
     return result.stdout.strip()
 
@@ -805,6 +806,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         data_host (str): Имя или адрес хоста для проверки.
         paths (list[str]): Список путей (файлы/папки) для анализа размера.
         exclude_exts (list[str]): Список расширений для исключения из проверки.
+        action (Literal['push', 'delete']): Тип действия для оценки - 'push' для деплоя, 'delete' для удаления.
     """
     used_deploy = 0
     freed_by_delete = 0
