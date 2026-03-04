@@ -1113,7 +1113,7 @@ def main() -> None:
         if not ok_status:
             save_log("Ошибка: md5-хэши не совпали после синхронизации", with_exit=True)
 
-    save_log(f"Синхронизация завершена успешно для {hosts} хостов")
+    save_log(f"Синхронизация завершена успешно для {hosts} хостов", info_level=True)
 
     sys.exit(0)
 
