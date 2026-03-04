@@ -819,7 +819,7 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         # Получаем список файлов на сервере
             rel_path = os.path.relpath(path, AIRFLOW_DEPLOY_PATH)
             remote_find_cmd = (
-                "ssh " + SSH_USER + "@" + data_host +
+                SSH_USER + "@" + data_host +
                 " 'find " + AIRFLOW_PATH + rel_path +
                 " -type f -exec stat -c \"%s\" {} \\; 2>/dev/null'"
             )
@@ -827,8 +827,8 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             remote_size = 0
             for line in remote_out.splitlines():
                 try:
-                    _, size = line.strip().rsplit(' ', 1)
-                    remote_size += int(size)
+                    size = int(line.strip())
+                    remote_size += size
                 except Exception:
                     continue
             mb = remote_size / 1024 / 1024
