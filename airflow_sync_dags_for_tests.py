@@ -811,10 +811,10 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
 
     full_paths = [f"{AIRFLOW_DEPLOY_PATH}{path}" for path in paths]
     mb = 0
-    for path in full_paths:
-        if action == 'delete':
-            # Для удаления: считаем размер файлов/директорий, которые будут удалены на сервере
-            # Получаем список файлов на сервере
+    if action == 'delete':
+        for path in full_paths:
+        # Для удаления: считаем размер файлов/директорий, которые будут удалены на сервере
+        # Получаем список файлов на сервере
             remote_find_cmd = (
                 SSH_USER + "@" + data_host +
                 " 'find " + path +
@@ -831,9 +831,9 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
             mb = remote_size / 1024 / 1024
             freed_by_delete += mb
             save_log(f"Удаление {path} освободит {mb:.3f} mb на сервере {data_host}", info_level=True)
-        else:
-            # Для деплоя: сравниваем пофайлово локальные и серверные размеры
-            local_files = {}
+    else:
+        local_files = {}
+        for path in full_paths:
             for root, _, files in os.walk(path):
                 for file in files:
                     if exclude_exts and any(file.endswith(ext) for ext in exclude_exts):
@@ -844,36 +844,34 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
                         local_files[rel_path] = os.path.getsize(abs_path)
                     except Exception:
                         pass
-            # Получаем размеры файлов на сервере
-            remote_find_cmd = (
-                SSH_USER + "@" + data_host +
-                " 'find " + AIRFLOW_PATH +
-                " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
-            )
-            remote_files = {}
-            remote_out = get_stdout_from_cmd(remote_find_cmd)
-            for line in remote_out.splitlines():
-                print(f"DEBUG: processing remote line: {line}")
-                try:
-                    rel, sz = line.strip().rsplit(' ', 1)
-                    rel = os.path.relpath(rel, AIRFLOW_PATH)
-                    remote_files[rel] = int(sz)
-                except Exception:
-                    save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
-                    continue
-            
-            print(f"DEBUG: local_files={local_files}")
-            print(f"DEBUG: remote_files={remote_files}")
-            # Считаем разницу по каждому локальному файлу
-            for rel, lsz in local_files.items():
-                rsz = remote_files.get(rel, 0)
-                diff = lsz - rsz
-                if diff > 0:
-                    used_deploy += diff
-            print(f"DEBUG: used_deploy={used_deploy} bytes")
-            # Для новых файлов (которых нет на сервере) — учитывается полный размер
-            # Для файлов, которые уменьшатся — учитывается только разница
-            mb = used_deploy / 1024 / 1024
+        # Получаем размеры файлов на сервере
+        remote_find_cmd = (
+            SSH_USER + "@" + data_host +
+            " 'find " + AIRFLOW_PATH +
+            " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
+        )
+        remote_files = {}
+        remote_out = get_stdout_from_cmd(remote_find_cmd)
+        for line in remote_out.splitlines():
+            print(f"DEBUG: processing remote line: {line}")
+            try:
+                rel, sz = line.strip().rsplit(' ', 1)
+                rel = os.path.relpath(rel, AIRFLOW_PATH)
+                remote_files[rel] = int(sz)
+            except Exception:
+                save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
+                continue
+        
+        print(f"DEBUG: local_files={local_files}")
+        print(f"DEBUG: remote_files={remote_files}")
+        # Считаем разницу по каждому локальному файлу
+        for rel, lsz in local_files.items():
+            rsz = remote_files.get(rel, 0)
+            diff = lsz - rsz
+            if diff > 0:
+                used_deploy += diff
+        print(f"DEBUG: used_deploy={used_deploy} bytes")
+        mb = used_deploy / 1024 / 1024
 
     save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
 
