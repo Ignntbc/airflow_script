@@ -459,60 +459,52 @@ def check_param_file_key(
     save_log("Результат деплоя файлов: успешно", info_level=True)
 
 
-@log_exceptions(log_message="Ошибка при обновлении содержимого директории", context_arg_name="host_name")
-def remote_update_items(elem: str, host_name: str, exclude_exts: Optional[list[str]] = None) -> None:
+@log_exceptions(log_message="Ошибка при удалении содержимого директории", context_arg_name="host_name")
+def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[str]] = None) -> None:
     """
-    Копирует с заменой все файлы из основной директории на сервер, исключая __pycache__ и указанные расширения.
-    Для dags пропускает __pycache__, .pyc и exclude_exts.
-    """
-    save_log(f"Запуск копирования с заменой содержимого директории: {AIRFLOW_DEPLOY_PATH}{elem} -> {AIRFLOW_PATH}{elem} на хосте {host_name}", info_level=True)
-    src_dir = f"{AIRFLOW_DEPLOY_PATH}{elem}"
-    dst_dir = f"{AIRFLOW_PATH}{elem}"
-    exclude_args = ''
-    if exclude_exts:
-        exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
-    chmod_string = get_chmod_string(elem)
-    host_prefix = f"airflow_deploy@{host_name}:"
-    if elem == "dags":
-        # Копируем все кроме __pycache__, .pyc и exclude_exts
-        rsync_cmd = (
-            f"rsync --checksum -rogp {exclude_args} --exclude='__pycache__' --exclude='*.pyc' {CHOWN_STRING} {chmod_string} "
-            f"{src_dir}/ {host_prefix}{dst_dir}"
-        )
-        result = run_command_with_log(rsync_cmd, f"Копирование с заменой: {src_dir} -> {dst_dir} на хосте {host_name}", info_level=True)
-        save_log(f"Результат копирования {src_dir} -> {dst_dir} на хосте {host_name}: {result.strip()}", info_level=True)
-        
-        src_sql = f"{AIRFLOW_DEPLOY_PATH}dags/sql"
-        dst_sql = f"{AIRFLOW_PATH}dags/sql"
-        if os.path.exists(src_sql):
-            rsync_sql_cmd = (
-                f"rsync --checksum -rogp {CHOWN_STRING} {chmod_string} {src_sql}/ {host_prefix}{dst_sql}"
-            )
-            result_sql = run_command_with_log(rsync_sql_cmd, f"Копирование SQL-файлов: {src_sql} -> {dst_sql} на хосте {host_name}", info_level=True)
-            save_log(f"Результат копирования SQL-файлов на хосте {host_name}: {result_sql.strip()}", info_level=True)
-        else:
-            save_log(f"Директория {src_sql} не найдена, копирование SQL-файлов пропущено", info_level=True)
-    else:
-        rsync_cmd = (
-            f"rsync --checksum -rogp {exclude_args} {CHOWN_STRING} {chmod_string} "
-            f"{src_dir}/ {host_prefix}{dst_dir}"
-        )
-        result = run_command_with_log(rsync_cmd, f"Копирование с заменой: {src_dir} -> {dst_dir} на хосте {host_name}", info_level=True)
-        save_log(f"Результат копирования {src_dir} -> {dst_dir} на хосте {host_name}: {result.strip()}", info_level=True)
+    Удаляет все элементы в целевой директории на удалённом хосте.
+    Для dags пропускает __pycache__, для остальных удаляет все элементы.
 
-@log_exceptions(log_message="Ошибка при обновлении целевых папок")
-def update_destination_folders(exclude_exts: Optional[list[str]] = None) -> None:
+    Аргументы:
+        elem (str): Имя папки для очистки (например, "dags", "keys" и т.д.).
+        host_name (str): Имя или IP-адрес удалённого хоста, на котором будет производиться очистка.
     """
-    Копирует с заменой все файлы из основной директории на сервер для всех целевых папок.
-    Для dags пропускает каталоги __pycache__, .pyc и exclude_exts.
+    save_log(f"Запуск удаления содержимого директории: {AIRFLOW_PATH}{elem} на хосте {host_name}", info_level=True)
+    items_str = run_command_with_log(f"{SSH_USER}@{host_name} ls -a {AIRFLOW_PATH}{elem}/", f"Получение списка элементов в {AIRFLOW_PATH}{elem} на хосте {host_name}")
+    items = [x for x in items_str.split("\n") if x not in {".", "..", ""}]
+    if elem == "dags":
+        for item in items:
+            ext = os.path.splitext(item)[1]
+            if "__pycache__" in item or ".pyc" in item:
+                continue
+            if exclude_exts and ext in exclude_exts:
+                continue
+            result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/{item}", f"Удаление: {AIRFLOW_PATH}dags/{item} на хосте {host_name}", info_level=True)
+            save_log(f"Результат удаления {AIRFLOW_PATH}dags/{item} на хосте {host_name}: {result.strip()}", info_level=True)
+        result_sql = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/sql/*", f"Удаление SQL-файлов в директории dags/sql на хосте {host_name}", info_level=True)
+        save_log(f"Результат удаления SQL-файлов на хосте {host_name}: {result_sql.strip()}", info_level=True)
+    else:
+        for item in items:
+            result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rf {AIRFLOW_PATH}{elem}/{item}", f"Удаление: {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}", info_level=True)
+            save_log(f"Результат удаления {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}: {result.strip()}", info_level=True)
+
+
+
+@log_exceptions(log_message="Ошибка при очистке целевых папок")
+def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None:
     """
-    save_log("Запуск копирования с заменой содержимого целевых папок на удалённых хостах airflow_deploy через ssh", info_level=True)
+    Удаляет содержимое целевых папок на удалённом сервере airflow_deploy через ssh.
+    Для папки dags пропускает каталоги __pycache__, для остальных удаляет все элементы.
+    """
+    save_log("Запуск очистки целевых папок на удалённых хостах airflow_deploy через ssh", info_level=True)
     hosts = get_hosts()
     for host_name in hosts:
-        save_log(f"Копирование с заменой на хосте: {host_name}", info_level=True)
+        save_log(f"Очистка на хосте: {host_name}", info_level=True)
         for elem in list_folders:
-            remote_update_items(elem, host_name, exclude_exts)
-    save_log("Копирование с заменой содержимого целевых папок на удалённых хостах завершено успешно", info_level=True)
+            remote_delete_items(elem, host_name, exclude_exts)
+
+    save_log("Очистка целевых папок на удалённых хостах завершена успешно", info_level=True)
+
     sys.exit(0)
 
 
@@ -662,7 +654,7 @@ def check_param_run(keys: list[str],
         "--delete": lambda: check_param_delete_key(paths),
         "--file": lambda: check_param_file_key(paths),
         "--dir": lambda: check_param_dir_key(paths, exclude_exts),
-        "-c":  lambda: update_destination_folders(exclude_exts),
+        "-c":  lambda: remove_destination_folders(exclude_exts),
         "--dry-run": check_rsync_host,
         "": lambda: check_full_sync(exclude_exts),
     }
@@ -1006,7 +998,6 @@ def check_rsync_host() -> None:
     Проверяет возможность синхронизации директорий с помощью rsync на указанный хост.
     """
     hosts = get_hosts()
-    
     for host_name in hosts:
         save_log(f"Запуск проверки запуска rsync на хосте: {host_name}")
         for folder in list_folders:
