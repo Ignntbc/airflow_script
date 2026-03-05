@@ -7,6 +7,7 @@ import subprocess
 import socket
 import logging
 from datetime import datetime
+from threading import local
 from typing import List, Optional, Literal
 
 
@@ -502,7 +503,8 @@ def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None
         save_log(f"Очистка на хосте: {host_name}", info_level=True)
         for elem in list_folders:
             remote_delete_items(elem, host_name, exclude_exts)
-
+    
+    check_full_sync(exclude_exts)
     save_log("Очистка целевых папок на удалённых хостах завершена успешно", info_level=True)
 
     sys.exit(0)
@@ -851,6 +853,7 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
     if '-c' in keys:
         local_size = sum(local_files.values())
         remote_size = sum(remote_files.values())
+        print(local_size, remote_size)
         diff = local_size - remote_size
         if diff < 0:
             save_log(f"После деплоя освободится дополнительно {abs(diff) / 1024 / 1024:.3f} mb на сервере {data_host}", info_level=True)
