@@ -139,7 +139,7 @@ LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy.log')
 LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
 LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
 
-LOG_MAX_SIZE = 10 * 10 * 1024  # 10 МБ 
+LOG_MAX_SIZE = 10 * 10 * 1000  # 10 МБ 
 
 
 def file_size(path):
@@ -810,7 +810,7 @@ def get_freed_space_by_delete(full_paths: list[str], data_host: str):
                 remote_size += size
             except Exception:
                 continue
-        mb = remote_size / 1024 / 1024
+        mb = remote_size / 1000 / 1000
         freed_by_delete += mb
         save_log(f"Удаление {path} освободит {mb:.3f} mb на сервере {data_host}", info_level=True)
 
@@ -854,9 +854,9 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
         remote_size = sum(remote_files.values())
         diff = local_size - remote_size
         if diff < 0:
-            save_log(f"После деплоя освободится дополнительно {abs(diff) / 1024 / 1024:.3f} mb на сервере {data_host}", info_level=True)
+            save_log(f"После деплоя освободится дополнительно {abs(diff) / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
         else:
-            save_log(f"После деплоя потребуется дополнительно {diff / 1024 / 1024:.3f} mb на сервере {data_host}", info_level=True)
+            save_log(f"После деплоя потребуется дополнительно {diff / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
     else:
         for rel, lsz in local_files.items():
             rsz = remote_files.get(rel, 0)
@@ -864,13 +864,13 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
             if diff > 0:
                 used_deploy += diff
 
-        mb = used_deploy / 1024 / 1024
+        mb = used_deploy / 1000 / 1000
         disk_info_cmd = f"ssh airflow_deploy@{data_host} 'df --output=size,used,avail /app/airflow | tail -1'"
         disk_info_out = get_stdout_from_cmd(disk_info_cmd)
         try:
             size_str, used_str, avail_str = disk_info_out.strip().split()
-            size = int(size_str) * 1024 
-            used = int(used_str) * 1024
+            size = int(size_str) * 1000
+            used = int(used_str) * 1000
             used_after = used + used_deploy
             percent_after = int(used_after / size * 100)
             if percent_after >= CRITICAL_DISK_USAGE_PERCENT:
