@@ -520,7 +520,7 @@ def check_param_h_key() -> None:
         f" {AIRFLOW_DEPLOY_PATH}keys,  {AIRFLOW_DEPLOY_PATH}csv,  {AIRFLOW_DEPLOY_PATH}jar,  {AIRFLOW_DEPLOY_PATH}user_data с соответствующими директориями в /app/airflow\n"
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh\n\n") +
         "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА С КЛЮЧОМ -c:") + "\n"
-        f"    Производится синхронизация директорий назначения с заменой ( {AIRFLOW_PATH}dags,  {AIRFLOW_PATH}keytab,  {AIRFLOW_PATH}scripts,)\n"
+        f"    Производится синхронизация директорий назначения с предварительной очисткой ( {AIRFLOW_PATH}dags,  {AIRFLOW_PATH}keytab,  {AIRFLOW_PATH}scripts,)\n"
         f" {AIRFLOW_PATH}keys,  {AIRFLOW_PATH}csv,  {AIRFLOW_PATH}jar,  {AIRFLOW_PATH}user_data) перед синхронизацией\n"
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -c\n\n") +
         "\033[32m{}\033[0m".format("Запуск скрипта с ключом -h:") + "\n"
