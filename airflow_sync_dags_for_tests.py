@@ -1,3 +1,4 @@
+from os import path
 import shutil
 import os
 import hashlib
@@ -1120,7 +1121,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
             paths.append(f"{folder}")
 
     
-    elif keys == ["--dry-run"]:
+    elif (keys == ["--dry-run"] or "-c" in keys) and paths == []:
         for folder in list_folders:
             paths.append(f"{folder}")
 
