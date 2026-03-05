@@ -504,7 +504,7 @@ def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None
             remote_delete_items(elem, host_name, exclude_exts)
     
     check_full_sync(exclude_exts)
-    save_log("Очистка целевых папок на удалённых хостах завершена успешно", info_level=True)
+    save_log("Синхронизация папок на удалённых хостах, с предварительной очисткой, завершена успешно", info_level=True)
 
     sys.exit(0)
 
