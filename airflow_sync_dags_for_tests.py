@@ -1,4 +1,3 @@
-from os import path
 import shutil
 import os
 import hashlib
@@ -8,7 +7,6 @@ import subprocess
 import socket
 import logging
 from datetime import datetime
-from threading import local
 from typing import List, Optional, Literal
 
 
@@ -854,7 +852,6 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
     if '-c' in keys:
         local_size = sum(local_files.values())
         remote_size = sum(remote_files.values())
-        print(local_files, remote_files)
         diff = local_size - remote_size
         if diff < 0:
             save_log(f"После деплоя освободится дополнительно {abs(diff) / 1024 / 1024:.3f} mb на сервере {data_host}", info_level=True)

@@ -1102,9 +1102,13 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         else:
             paths.append(f"{arg}")
             i += 1
-
+    
     if set(keys) <= {"-v", "--exclude"}:
         keys.append("")
+        for folder in list_folders:
+            paths.append(f"{folder}")
+    
+    elif (keys == ["--dry-run"] or "-c" in keys) and paths == []:
         for folder in list_folders:
             paths.append(f"{folder}")
 
