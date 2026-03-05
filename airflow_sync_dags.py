@@ -496,6 +496,8 @@ def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None
         save_log(f"Очистка на хосте: {host_name}", info_level=True)
         for elem in list_folders:
             remote_delete_items(elem, host_name, exclude_exts)
+    
+    check_full_sync(exclude_exts)
 
     save_log("Очистка целевых папок на удалённых хостах завершена успешно", info_level=True)
 
@@ -781,8 +783,104 @@ def get_stdout_from_cmd(cmd: str) -> str:
         raise RuntimeError(f"Ошибка выполнения команды: {cmd}\nStderr: {result.stderr.strip()}")
     return result.stdout.strip()
 
+def get_freed_space_by_delete(full_paths: list[str], data_host: str):
+    """
+    Для списка путей full_paths считает, сколько места освободится на сервере data_host при удалении этих путей.
+    Возвращает общий объем в MB.
+    """
+    freed_by_delete = 0
+    for path in full_paths:
+        rel_path = os.path.relpath(path, AIRFLOW_DEPLOY_PATH)
+        remote_find_cmd = (
+            SSH_USER + "@" + data_host +
+            " 'find " + AIRFLOW_PATH + rel_path +
+            " -type f -exec stat -c \"%s\" {} \\; 2>/dev/null'"
+        )
+        remote_out = get_stdout_from_cmd(remote_find_cmd)
+        remote_size = 0
+        for line in remote_out.splitlines():
+            try:
+                size = int(line.strip())
+                remote_size += size
+            except Exception:
+                continue
+        mb = remote_size / 1024 / 1024
+        freed_by_delete += mb
+        save_log(f"Удаление {path} освободит {mb:.3f} mb на сервере {data_host}", info_level=True)
+
+def check_required_space_and_percent(full_paths: list[str], data_host: str, keys: list[str], exclude_exts: Optional[list[str]]) -> None:
+    """
+    Считает, сколько потребуется места после деплоя, и проверяет процент занятого места.
+    Выводит соответствующие логи и ошибки.
+    """
+    used_deploy = 0
+    local_files = {}
+    for path in full_paths:
+        for root, _, files in os.walk(path):
+            for file in files:
+                if exclude_exts and any(file.endswith(ext) for ext in exclude_exts):
+                    continue
+                abs_path = os.path.join(root, file)
+                rel_path = os.path.relpath(abs_path, AIRFLOW_DEPLOY_PATH)
+                try:
+                    local_files[rel_path] = os.path.getsize(abs_path)
+                except Exception:
+                    pass
+
+    remote_find_cmd = (
+        SSH_USER + "@" + data_host +
+        " 'find " + AIRFLOW_PATH +
+        " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
+    )
+    remote_files = {}
+    remote_out = get_stdout_from_cmd(remote_find_cmd)
+    for line in remote_out.splitlines():
+        try:
+            rel, sz = line.strip().rsplit(' ', 1)
+            rel = os.path.relpath(rel, AIRFLOW_PATH)
+            remote_files[rel] = int(sz)
+        except Exception:
+            save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
+            continue
+
+    if '-c' in keys:
+        local_size = sum(local_files.values())
+        remote_size = sum(remote_files.values())
+        diff = local_size - remote_size
+        if diff < 0:
+            save_log(f"После деплоя освободится дополнительно {abs(diff) / 1024 / 1024:.3f} mb на сервере {data_host}", info_level=True)
+        else:
+            save_log(f"После деплоя потребуется дополнительно {diff / 1024 / 1024:.3f} mb на сервере {data_host}", info_level=True)
+    else:
+        for rel, lsz in local_files.items():
+            rsz = remote_files.get(rel, 0)
+            diff = lsz - rsz
+            if diff > 0:
+                used_deploy += diff
+
+        mb = used_deploy / 1024 / 1024
+        disk_info_cmd = f"ssh airflow_deploy@{data_host} 'df --output=size,used,avail /app/airflow | tail -1'"
+        disk_info_out = get_stdout_from_cmd(disk_info_cmd)
+        try:
+            size_str, used_str, avail_str = disk_info_out.strip().split()
+            size = int(size_str) * 1024 
+            used = int(used_str) * 1024
+            used_after = used + used_deploy
+            percent_after = int(used_after / size * 100)
+            if percent_after >= CRITICAL_DISK_USAGE_PERCENT:
+                save_log(f"ОШИБКА: После деплоя будет занято {percent_after}% места на сервере {data_host}, превышен порог {CRITICAL_DISK_USAGE_PERCENT}%. Потребуется дополнительно {mb:.3f} MB. Деплой прерван.", with_exit=True)
+        except Exception as e:
+            save_log(f"Ошибка при получении информации о размере диска на сервере {data_host}: {disk_info_out} ({e})", with_exit=True)
+
+        save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
+
+
 @log_exceptions("Ошибка при проверке свободного места на хосте", "data_host")
-def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[list[str]] = None, action: Literal['push', 'delete'] = 'push') -> None:
+def check_free_space(data_host: str,
+                    paths: list[str],
+                    keys: list[str],
+                    exclude_exts: Optional[list[str]] = None,
+                    action: Literal['push', 'delete'] = 'push') -> None:
     """
     Проверяет свободное место на разделе {{ app_dir.path }} удалённого хоста и предупреждает,
     если после деплоя занятое место превысит критический порог.
@@ -793,68 +891,11 @@ def check_free_space(data_host: str, paths: list[str], exclude_exts: Optional[li
         exclude_exts (list[str]): Список расширений для исключения из проверки.
         action (Literal['push', 'delete']): Тип действия для оценки - 'push' для деплоя, 'delete' для удаления.
     """
-    used_deploy = 0
-    freed_by_delete = 0
-
     full_paths = [f"{AIRFLOW_DEPLOY_PATH}{path}" for path in paths]
-    mb = 0
     if action == 'delete':
-        for path in full_paths:
-            rel_path = os.path.relpath(path, AIRFLOW_DEPLOY_PATH)
-            remote_find_cmd = (
-                SSH_USER + "@" + data_host +
-                " 'find " + AIRFLOW_PATH + rel_path +
-                " -type f -exec stat -c \"%s\" {} \\; 2>/dev/null'"
-            )
-            remote_out = get_stdout_from_cmd(remote_find_cmd)
-            remote_size = 0
-            for line in remote_out.splitlines():
-                try:
-                    size = int(line.strip())
-                    remote_size += size
-                except Exception:
-                    continue
-            mb = remote_size / 1024 / 1024
-            freed_by_delete += mb
-            save_log(f"Удаление {path} освободит {mb:.3f} mb на сервере {data_host}", info_level=True)
+        get_freed_space_by_delete(full_paths, data_host)
     else:
-        local_files = {}
-        for path in full_paths:
-            for root, _, files in os.walk(path):
-                for file in files:
-                    if exclude_exts and any(file.endswith(ext) for ext in exclude_exts):
-                        continue
-                    abs_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(abs_path, AIRFLOW_DEPLOY_PATH)
-                    try:
-                        local_files[rel_path] = os.path.getsize(abs_path)
-                    except Exception:
-                        pass
-
-        remote_find_cmd = (
-            SSH_USER + "@" + data_host +
-            " 'find " + AIRFLOW_PATH +
-            " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
-        )
-        remote_files = {}
-        remote_out = get_stdout_from_cmd(remote_find_cmd)
-        for line in remote_out.splitlines():
-            try:
-                rel, sz = line.strip().rsplit(' ', 1)
-                rel = os.path.relpath(rel, AIRFLOW_PATH)
-                remote_files[rel] = int(sz)
-            except Exception:
-                save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
-                continue
-        
-        for rel, lsz in local_files.items():
-            rsz = remote_files.get(rel, 0)
-            diff = lsz - rsz
-            if diff > 0:
-                used_deploy += diff
-        mb = used_deploy / 1024 / 1024
-
-        save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
+        check_required_space_and_percent(full_paths, data_host, keys, exclude_exts)
 
 
 @log_exceptions("Ошибка при вычислении MD5-хеша для файла", "fname")
@@ -1002,7 +1043,7 @@ def check_rsync_host() -> None:
                 save_log(f"Ошибка при dry-run rsync для директории {folder} на хосте {host_name}: {str(e)}", with_exit=True)
 
 
-def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = [], keys: Optional[list[str]] = None) -> None:
+def host_checks(hostname: str, paths: list[str], keys: list[str], exclude_exts: Optional[list[str]] = None) -> None:
     """
     Выполняет все проверки для одного хоста:
     - Проверка доступности (ping)
@@ -1013,18 +1054,17 @@ def host_checks(hostname: str, paths: list[str], exclude_exts: list[str]|list = 
     Аргументы:
         hostname (str): Имя или адрес хоста для проверки.
         paths (list[str]): Список путей для проверки свободного места.
+        keys (list[str]): Список ключей для определения действий (например, --delete).
         exclude_exts (list[str]): Список расширений для исключения из проверки.
-        keys (Optional[list[str]]): Список ключей для определения действий (например, --delete).
     """
     action = 'push'
     if keys:
         if "--delete" in keys:
             action = 'delete'
     connect_write(hostname)
-    check_free_space(hostname, paths, exclude_exts, action=action)
+    check_free_space(hostname, paths, keys, exclude_exts, action=action)
     check_permissions(hostname)
     check_groups_users(hostname)
-
 
 @log_exceptions("Ошибка при парсинге аргументов командной строки")
 def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]:
@@ -1092,12 +1132,12 @@ def main() -> None:
     check_files_in_dirs()
     hosts = get_hosts()
     if CONFIGURATION == "one-way":
-        host_checks(current_hostname, paths, exclude_exts, keys)
+        host_checks(current_hostname, paths, keys, exclude_exts)
 
 
     if CONFIGURATION == "cluster":
         for hostname in all_hosts:
-            host_checks(hostname, paths, exclude_exts, keys)
+            host_checks(hostname, paths, keys, exclude_exts)
 
 
     check_param_run(keys, paths, exclude_exts)
