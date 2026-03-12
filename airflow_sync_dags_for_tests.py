@@ -802,7 +802,12 @@ def get_freed_space_by_delete(full_paths: list[str], data_host: str):
             " 'find " + AIRFLOW_PATH + rel_path +
             " -type f -exec stat -c \"%s\" {} \\; 2>/dev/null'"
         )
-        remote_out = get_stdout_from_cmd(remote_find_cmd)
+        try:
+            remote_out = get_stdout_from_cmd(remote_find_cmd)
+        except Exception as e:
+            save_log(f"Ошибка при получении размера файлов для удаления на хосте {data_host} по пути {path}: {str(e)}. Команда: {remote_find_cmd}", with_exit=True)
+            return
+        
         remote_size = 0
         for line in remote_out.splitlines():
             try:
@@ -839,14 +844,19 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
         " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
     )
     remote_files = {}
-    remote_out = get_stdout_from_cmd(remote_find_cmd)
+    try:
+        remote_out = get_stdout_from_cmd(remote_find_cmd)
+    except Exception as e:
+        save_log(f"Ошибка при получении размера файлов с удалённого хоста {data_host}: {str(e)}. Команда: {remote_find_cmd}", with_exit=True)
+        return
+    
     for line in remote_out.splitlines():
         try:
             rel, sz = line.strip().rsplit(' ', 1)
             rel = os.path.relpath(rel, AIRFLOW_PATH)
             remote_files[rel] = int(sz)
-        except Exception:
-            save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
+        except Exception as e:
+            save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line} ({e})", info_level=True)
             continue
 
     if '-c' in keys:
