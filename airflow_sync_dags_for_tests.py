@@ -17,10 +17,10 @@ CRITICAL_DISK_USAGE_PERCENT = 80
 ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude"]
 
 
-RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogp --rsync-path="mkdir -p'
-RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogp --rsync-path="mkdir -p'
-RSYNC_DRY_RUN = 'rsync --checksum -nrogp'
-RSYNC_CHECKSUM = "rsync --checksum -rogp"
+RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtp --rsync-path="mkdir -p'
+RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtp --rsync-path="mkdir -p'
+RSYNC_DRY_RUN = 'rsync --checksum -nrogtp'
+RSYNC_CHECKSUM = "rsync --checksum -rogtp"
 CHOWN_STRING = "--chown=airflow_deploy:airflow"
 CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
 AIRFLOW_PATH = "/app/airflow/"
@@ -585,7 +585,7 @@ def check_param_dir_key(
         for host in hosts:
             if path.count("/") > 1:
                 rsync_command = (
-                    f'rsync --checksum -rogp --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
+                    f'rsync --checksum -rogtp --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
                     f'{exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ '
                     f'{host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
                 )
@@ -603,7 +603,7 @@ def check_param_dir_key(
 
 
 @log_exceptions(log_message="Ошибка при полной синхронизации папок", context_arg_name="folder")
-def check_full_sync(exclude_exts: Optional[list[str]] = []) -> None:
+def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
     """
     Переносит все папки из list_folders с нужными chmod.
     Для keytab и keys используется CHMOD_WITHOUT_FU_FO_STRING,
@@ -636,7 +636,7 @@ def check_full_sync(exclude_exts: Optional[list[str]] = []) -> None:
 @log_exceptions(log_message="Ошибка при обработке параметров командной строки")
 def check_param_run(keys: list[str],
                     paths: list[str],
-                    exclude_exts: Optional[list[str]] = []) -> None:
+                    exclude_exts: Optional[list[str]] = None) -> None:
     """
     Обрабатывает параметры командной строки для управления синхронизацией и удалением файлов/директорий Airflow.
     Аргументы:
@@ -935,7 +935,7 @@ def get_dir_fingerprint_hashes(base_dir: str, root_dir: str, exclude_exts: Optio
             rel = os.path.relpath(abs_path, base_dir)
             try:
                 stat_result = os.stat(abs_path)
-                fingerprint = f"{stat_result.st_mtime:.6f}-{stat_result.st_size}"
+                fingerprint = f"{int(stat_result.st_mtime)}-{stat_result.st_size}"
                 hashes[rel] = fingerprint
             except Exception:
                 continue
@@ -972,7 +972,7 @@ def get_remote_fingerprint_hashes(host: str, path: str, is_dir: bool) -> dict[st
             remote_path, stat_value = line.strip().rsplit(" ", 1)
             rel = os.path.relpath(remote_path, AIRFLOW_PATH)
             mtime_str, size_str = stat_value.split("-", 1)
-            fingerprint = f"{float(mtime_str):.6f}-{int(size_str)}"
+            fingerprint = f"{int(mtime_str)}-{int(size_str)}"
             hashes[rel] = fingerprint
         except Exception:
             if not is_dir:
@@ -1008,7 +1008,7 @@ def check_hashes(paths: list[str], hosts: list[str],
             rel = path
             try:
                 stat_result = os.stat(src_full)
-                fingerprint = f"{stat_result.st_mtime:.6f}-{stat_result.st_size}"
+                fingerprint = f"{int(stat_result.st_mtime)}-{stat_result.st_size}"
                 src_hashes[rel] = fingerprint
             except Exception:
                 continue
