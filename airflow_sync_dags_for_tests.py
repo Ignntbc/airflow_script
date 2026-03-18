@@ -1177,10 +1177,11 @@ def timer_setup(seconds: int = 300,
     timer_thread = threading.Timer(seconds, handler)
     timer_thread.daemon = True
     return timer_thread
-
+import time
 if __name__ == "__main__":
     timer = timer_setup(300, timeout_handler)
     timer.start()
+    time.sleep(320)
     try:
         main()
     finally:
