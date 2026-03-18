@@ -1132,9 +1132,6 @@ def main() -> None:
         dir_allowed = is_dir_allowed(path)
         if not dir_allowed:
             save_log(f"Ошибка: недопустимый путь для синхронизации: {path}", with_exit=True)
-    
-    # for check_folder, check_extension in ext_map.items():
-    #     check_type_file(check_folder, check_extension)
 
     param_run_script(keys)
     check_files_in_dirs()
@@ -1144,11 +1141,6 @@ def main() -> None:
 
 
     if CONFIGURATION == "cluster":
-        # processes = [Process(target=host_checks, args=(hostname, paths)) for hostname in all_hosts]
-        # for p in processes:
-        #     p.start()
-        # for p in processes:
-        #     p.join()
         for hostname in all_hosts:
             host_checks(hostname, paths, keys, exclude_exts)
 
@@ -1157,7 +1149,7 @@ def main() -> None:
     if any(key in keys for key in ["--dir", "--file", "-c", ""]):
         ok_status = check_hashes(paths, hosts, exclude_exts)
         if not ok_status:
-            save_log("Ошибка: md5-хэши не совпали после синхронизации", with_exit=True)
+            save_log("Ошибка: fingerprints не совпали после синхронизации", with_exit=True)
     
     save_log(f"Синхронизация завершена успешно для {hosts} хостов", info_level=True)
 
@@ -1177,11 +1169,10 @@ def timer_setup(seconds: int = 300,
     timer_thread = threading.Timer(seconds, handler)
     timer_thread.daemon = True
     return timer_thread
-import time
+
 if __name__ == "__main__":
     timer = timer_setup(300, timeout_handler)
     timer.start()
-    time.sleep(320)
     try:
         main()
     finally:

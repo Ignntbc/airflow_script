@@ -1,11 +1,12 @@
 import shutil
 import os
-import hashlib
+from collections.abc import Callable
 import json
 import sys
 import subprocess
 import socket
 import logging
+import threading
 from typing import Literal, Optional
 from datetime import datetime
 from typing import List
@@ -13,10 +14,10 @@ from typing import List
 
 CRITICAL_DISK_USAGE_PERCENT = 80
 ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude"]
-RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogp --rsync-path="mkdir -p'
-RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogp --rsync-path="mkdir -p'
-RSYNC_DRY_RUN = 'rsync --checksum -nrogp'
-RSYNC_CHECKSUM = "rsync --checksum -rogp"
+RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtp --rsync-path="mkdir -p'
+RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtp --rsync-path="mkdir -p'
+RSYNC_DRY_RUN = 'rsync --checksum -nrogtp'
+RSYNC_CHECKSUM = "rsync --checksum -rogtp"
 CHOWN_STRING = "--chown={{ airflow_deploy_suz_account.user }}:{{ airflow_tuz_account.user }}"
 CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
 AIRFLOW_PATH = "{{ airflow_dir.path }}/"
@@ -580,7 +581,7 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
         for host in hosts:
             if path.count("/") > 1:
                 rsync_command = (
-                    f'rsync --checksum -rogp --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
+                    f'rsync --checksum -rogtp --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
                     f'{exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ '
                     f'{host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
                 )
@@ -854,13 +855,9 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
             continue
 
     if '-c' in keys:
-        local_size = sum(local_files.values())
         remote_size = sum(remote_files.values())
-        diff = local_size - remote_size
-        if diff < 0:
-            save_log(f"После деплоя освободится дополнительно {abs(diff) / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
-        else:
-            save_log(f"После деплоя потребуется дополнительно {diff / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+        save_log(f"После деплоя освободится дополнительно {remote_size / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+        
     else:
         for rel, lsz in local_files.items():
             rsz = remote_files.get(rel, 0)
@@ -908,50 +905,14 @@ def check_free_space(data_host: str,
         check_required_space_and_percent(full_paths, data_host, keys, exclude_exts)
 
 
-@log_exceptions("Ошибка при вычислении MD5-хеша для файла", "fname")
-def md5(fname: str) -> str:
+@log_exceptions("Ошибка при получении отпечатков файлов в директории", "root_dir")
+def get_dir_fingerprint_hashes(base_dir: str, root_dir: str, exclude_exts: Optional[list[str]] = None) -> dict[str, str]:
     """
-    Вычисляет MD5-хеш для указанного файла.
-
-    Аргументы:
-        fname (str): Путь к файлу для вычисления хеша.
-    Возвращает:
-        str: Строка с MD5-хешем файла.
-    """
-    save_log(f"Вычисление MD5-хеша для файла: {fname}")
-    hash_md5 = hashlib.md5()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-
-@log_exceptions("Ошибка при заполнении словаря PATH_SUM")
-def path_sum_files() -> dict[str, str]:
-    """
-    Заполняет глобальный словарь PATH_SUM md5-хешами всех файлов во всех прикладных директориях.
-
-    Для каждого файла в директориях из list_folders вычисляет md5-хеш и сохраняет его в PATH_SUM.
-    Возвращает:
-        dict[str, str]: Словарь, где ключ - полный путь к файлу, а значение - его MD5-хеш.
-    """
-    save_log("Запуск заполнения словаря PATH_SUM md5-хешами всех файлов во всех прикладных директориях")
-    path_sum = {}
-    for list_folder in list_folders:
-        for root, _, files in os.walk(f"{AIRFLOW_DEPLOY_PATH}{list_folder}"):
-            for file in files:
-                path_sum[f"{root}/{file}"] = md5(f"{root}/{file}")
-
-    return path_sum
-
-
-def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: Optional[list[str]] = None) -> dict:
-    """
-    Возвращает словарь md5-хэшей для всех файлов в директории root_dir относительно base_dir.
+    Возвращает словарь отпечатков (mtime+size) для всех файлов в директории root_dir относительно base_dir.
     :param base_dir: Базовая директория для относительных путей.
     :param root_dir: Директория, в которой искать файлы.
     :param exclude_exts: Список расширений файлов для исключения.
-    :return: dict {относительный_путь: md5}
+    :return: dict {относительный_путь: fingerprint}
     """
     hashes = {}
     for root, _, files in os.walk(root_dir):
@@ -960,58 +921,69 @@ def get_dir_md5_hashes(base_dir: str, root_dir: str, exclude_exts: Optional[list
                 continue
             abs_path = os.path.join(root, file)
             rel = os.path.relpath(abs_path, base_dir)
-            hashes[rel] = md5(abs_path)
-
+            try:
+                stat_result = os.stat(abs_path)
+                fingerprint = f"{int(stat_result.st_mtime)}-{stat_result.st_size}"
+                hashes[rel] = fingerprint
+            except Exception:
+                continue
     return hashes
 
-
-def get_remote_md5_hashes(host: str, path: str, is_dir: bool) -> dict:
+@log_exceptions("Ошибка при получении отпечатков файлов на удалённом хосте", "host")
+def get_remote_fingerprint_hashes(host: str, path: str, is_dir: bool) -> dict[str, str]:
     """
-    Получает md5-хэши файлов на удалённом хосте airflow_deploy@host для указанного пути.
+    Получает отпечатки (mtime+size) файлов на удалённом хосте airflow_deploy@host для указанного пути.
     :param host: имя хоста
     :param path: относительный путь (от AIRFLOW_DEPLOY_PATH)
     :param is_dir: True если директория, False если файл
-    :return: dict {относительный_путь: md5}
+    :return: dict {относительный_путь: fingerprint}
     """
-    hashes = {}
+    hashes: dict[str, str] = {}
     if is_dir:
-        find_cmd = f"ssh airflow_deploy@{host} 'find {AIRFLOW_PATH}{path} -type f'"
-        proc = subprocess.Popen(find_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, _ = proc.communicate()
-        files_list = out.decode("utf-8").strip().split("\n")
-        for dst_file in files_list:
-            if dst_file:
-                rel = os.path.relpath(dst_file, AIRFLOW_PATH)
-                md5_cmd = f"ssh airflow_deploy@{host} 'md5sum {dst_file}'"
-                p = subprocess.Popen(md5_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                md5_out, _ = p.communicate()
-                md5_line = md5_out.decode("utf-8").strip().split()
-                if md5_line:
-                    hashes[rel] = md5_line[0]
+        remote_stat_cmd = (
+            f"{SSH_USER}@{host} "
+            f"'find {AIRFLOW_PATH}{path} -type f -exec stat -c \"%n %Y-%s\" {{}} \\; 2>/dev/null'"
+        )
     else:
-        dst_file = f"{AIRFLOW_PATH}{path}"
-        md5_cmd = f"ssh airflow_deploy@{host} 'md5sum {dst_file}'"
-        p = subprocess.Popen(md5_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        md5_out, _ = p.communicate()
-        md5_line = md5_out.decode("utf-8").strip().split()
-        if md5_line:
-            hashes[path] = md5_line[0]
+        remote_stat_cmd = (
+            f"{SSH_USER}@{host} "
+            f"'stat -c \"%n %Y-%s\" {AIRFLOW_PATH}{path} 2>/dev/null'"
+        )
+    try:
+        remote_out = get_stdout_from_cmd(remote_stat_cmd)
+    except Exception as e:
+        save_log(f"Ошибка при выполнении команды на удалённом хосте {host}: {str(e)}", with_exit=True)
+        return hashes
+
+    for line in remote_out.splitlines():
+        try:
+            remote_path, stat_value = line.strip().rsplit(" ", 1)
+            rel = os.path.relpath(remote_path, AIRFLOW_PATH)
+            mtime_str, size_str = stat_value.split("-", 1)
+            fingerprint = f"{int(mtime_str)}-{int(size_str)}"
+            hashes[rel] = fingerprint
+        except Exception:
+            if not is_dir:
+                pass
+            else:
+                continue
 
     return hashes
 
 
-@log_exceptions("Ошибка при проверке md5-хэшей между источником и целями")
-def check_hashes(paths: list[str], hosts: list[str], exclude_exts: Optional[list[str]] = None) -> bool:
+@log_exceptions("Ошибка при проверке отпечатков между источником и целями")
+def check_hashes(paths: list[str], hosts: list[str],
+                 exclude_exts: Optional[list[str]] = None) -> bool:
     """
-    Сравнивает md5-хэши между источником и целями.
+    Сравнивает отпечатки (mtime+size) между источником и целями.
 
     Аргументы:
         paths (list[str]): Список относительных путей к файлам или директориям (от AIRFLOW_DEPLOY_PATH).
         hosts (list[str]): Список хостов для проверки.
     Возвращает:
-        bool: True если все хэши совпадают на всех хостах, иначе False.
+        bool: True если все отпечатки совпадают на всех хостах, иначе False.
     """
-    save_log(f"Запуск проверки md5-хэшей для путей: {paths} на хостах: {hosts}")
+    save_log(f"Запуск проверки отпечатков (mtime+size) для путей: {paths} на хостах: {hosts}")
     all_ok = True
     for path in paths:
         src_full = os.path.join(AIRFLOW_DEPLOY_PATH, path)
@@ -1019,20 +991,25 @@ def check_hashes(paths: list[str], hosts: list[str], exclude_exts: Optional[list
         is_dir = os.path.isdir(src_full)
 
         if is_dir:
-            src_hashes = get_dir_md5_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts)
+            src_hashes = get_dir_fingerprint_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts)
         else:
             rel = path
-            src_hashes[rel] = md5(src_full)
-
+            try:
+                stat_result = os.stat(src_full)
+                fingerprint = f"{int(stat_result.st_mtime)}-{stat_result.st_size}"
+                src_hashes[rel] = fingerprint
+            except Exception:
+                continue
 
         for host in hosts:
-            dst_hashes = get_remote_md5_hashes(host, path, is_dir)
-            for rel, src_md5 in src_hashes.items():
-                dst_md5 = dst_hashes.get(rel)
-                if not dst_md5 or src_md5 != dst_md5:
-                    save_log(f"Несовпадение md5 для {rel} на {host}: src={src_md5}, dst={dst_md5}", info_level=True)
+            dst_hashes = get_remote_fingerprint_hashes(host, path, is_dir)
+            for rel, src_fp in src_hashes.items():
+                dst_fp = dst_hashes.get(rel)
+                if not dst_fp or src_fp != dst_fp:
+                    save_log(f"Несовпадение отпечатка для {rel} на {host}: src={src_fp}, dst={dst_fp}", info_level=True)
                     all_ok = False
                     return all_ok
+
     return all_ok
 
 
@@ -1124,6 +1101,26 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
 
     return paths, keys, exclude_exts
 
+def timeout_handler():
+    """Обработчик для таймера, который вызывается при превышении времени выполнения скрипта."""
+    logging.critical("Превышено время выполнения скрипта (таймаут 5 минут)")
+    os._exit(1)
+
+
+def timer_setup(seconds: int = 300,
+                handler: Callable= timeout_handler) -> threading.Timer:
+    """
+    Настраивает таймер для ограничения времени выполнения скрипта.
+    Аргументы:
+        seconds (int): Количество секунд до срабатывания таймера (по умолчанию 300 секунд = 5 минут).
+        handler (callable): Функция-обработчик, которая будет вызвана при срабатывании таймера. Если не указано, используется функция по умолчанию, которая завершает процесс.
+    Возвращает:
+        threading.Timer: Объект таймера, который можно запустить и отменить.
+    """
+    timer_thread = threading.Timer(seconds, handler)
+    timer_thread.daemon = True
+    return timer_thread
+
 
 def main() -> None:
     """
@@ -1148,7 +1145,6 @@ def main() -> None:
     if CONFIGURATION == "one-way":
         host_checks(current_hostname, paths, keys, exclude_exts)
 
-
     if CONFIGURATION == "cluster":
         for hostname in all_hosts:
             host_checks(hostname, paths, keys, exclude_exts)
@@ -1158,11 +1154,16 @@ def main() -> None:
     if any(key in keys for key in ["--dir", "--file", "-c", ""]):
         ok_status = check_hashes(paths, hosts, exclude_exts)
         if not ok_status:
-            save_log("Ошибка: md5-хэши не совпали после синхронизации", with_exit=True)
-
+            save_log("Ошибка: fingerprints не совпали после синхронизации", with_exit=True)
+    
     save_log(f"Синхронизация завершена успешно для {hosts} хостов", info_level=True)
-
     sys.exit(0)
 
+
 if __name__ == "__main__":
-    main()
+    timer = timer_setup(300, timeout_handler)
+    timer.start()
+    try:
+        main()
+    finally:
+        timer.cancel()
