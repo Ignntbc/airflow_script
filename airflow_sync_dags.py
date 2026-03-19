@@ -13,10 +13,10 @@ from datetime import datetime
 
 CRITICAL_DISK_USAGE_PERCENT = 80
 ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude"]
-RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtp --rsync-path="mkdir -p'
-RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtp --rsync-path="mkdir -p'
-RSYNC_DRY_RUN = 'rsync --checksum -nrogtp'
-RSYNC_CHECKSUM = "rsync --checksum -rogtp"
+RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtpO --rsync-path="mkdir -p'
+RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtpO --rsync-path="mkdir -p'
+RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
+RSYNC_CHECKSUM = "rsync --checksum -rogtpO"
 CHOWN_STRING = "--chown={{ airflow_deploy_suz_account.user }}:{{ airflow_tuz_account.user }}"
 CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
 AIRFLOW_PATH = "{{ airflow_dir.path }}/"
@@ -622,7 +622,7 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
         for host in hosts:
             if path.count("/") > 1:
                 rsync_command = (
-                    f'rsync --checksum -rogtp --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
+                    f'rsync --checksum -rogtpO --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
                     f'{exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ '
                     f'{host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
                 )
@@ -896,8 +896,13 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
             continue
 
     if '-c' in keys:
+        local_size = sum(local_files.values())
         remote_size = sum(remote_files.values())
-        save_log(f"После деплоя освободится дополнительно {remote_size / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+        diff = local_size - remote_size
+        if diff < 0:
+            save_log(f"После деплоя освободится дополнительно {abs(diff) / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+        else:
+            save_log(f"После деплоя потребуется дополнительно {diff / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
 
     else:
         for rel, lsz in local_files.items():

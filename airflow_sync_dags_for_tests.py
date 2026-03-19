@@ -861,8 +861,13 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
             continue
 
     if '-c' in keys:
+        local_size = sum(local_files.values())
         remote_size = sum(remote_files.values())
-        save_log(f"После деплоя освободится дополнительно {remote_size / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+        diff = local_size - remote_size
+        if diff < 0:
+            save_log(f"После деплоя освободится дополнительно {abs(diff) / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+        else:
+            save_log(f"После деплоя потребуется дополнительно {diff / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
 
     else:
         for rel, lsz in local_files.items():
