@@ -891,7 +891,7 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
             save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
             continue
 
-    if '-c' in keys:
+    if {"-c", "--copy"} & set(keys):
         local_size = sum(local_files.values())
         remote_size = sum(remote_files.values())
         diff = local_size - remote_size
