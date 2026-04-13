@@ -31,7 +31,7 @@ CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo="
 
 VERBOSE = "-v" in sys.argv
 
-LOCAL_TEST = False
+LOCAL_TEST = True
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 
