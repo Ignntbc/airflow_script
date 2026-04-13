@@ -532,10 +532,10 @@ def check_param_h_key() -> None:
     Блок справки по ключу -h.
     """
     help_text = (
-        "\033[32m{}\033[0m".format("\nДОСТУПНЫЕ КЛЮЧИ: [-c], [-h], [--delete], [--file], [--dir]\n\n") +
+        "\033[32m{}\033[0m".format("\nДОСТУПНЫЕ КЛЮЧИ: [-c], [-h], [--delete], [--file], [--dir], [--copy], [--dry-run], [-v], [--exclude]\n\n") +
         "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА БЕЗ ПАРАМЕТРОВ:") + "\n"
         f"    Синхронизация содержимого директорий  {AIRFLOW_DEPLOY_PATH}dags,  {AIRFLOW_DEPLOY_PATH}keytab,  {AIRFLOW_DEPLOY_PATH}scripts,\n"
-        f" {AIRFLOW_DEPLOY_PATH}keys,  {AIRFLOW_DEPLOY_PATH}csv,  {AIRFLOW_DEPLOY_PATH}jar,  {AIRFLOW_DEPLOY_PATH}user_data с соответствующими директориями в /app/airflow\n"
+        f" {AIRFLOW_DEPLOY_PATH}keys,  {AIRFLOW_DEPLOY_PATH}csv,  {AIRFLOW_DEPLOY_PATH}jar,  {AIRFLOW_DEPLOY_PATH}user_data с соответствующими директориями в {AIRFLOW_PATH}\n"
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh\n\n") +
         "\033[32m{}\033[0m".format("ЗАПУСК СКРИПТА С КЛЮЧОМ -c:") + "\n"
         f"    Производится синхронизация директорий назначения с предварительной очисткой ( {AIRFLOW_PATH}dags,  {AIRFLOW_PATH}keytab,  {AIRFLOW_PATH}scripts,)\n"
@@ -554,12 +554,19 @@ def check_param_h_key() -> None:
         "\033[32m{}\033[0m".format("Запуск скрипта с ключом --dir:") + "\n"
         f"    Деплой указанной директории (отсчет идет от  {AIRFLOW_DEPLOY_PATH}) из  {AIRFLOW_DEPLOY_PATH} в  {AIRFLOW_PATH}\n"
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА : sudo -u airflow_deploy ./airflow_sync_dags.sh --dir dags/test_dir\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --copy:") + "\n"
+        "    Тиражирование директории с приведением целевой директории к точной копии источника (аналог rsync --delete).\n"
+        "    Новые и измененные файлы копируются, отсутствующие в источнике файлы удаляются из цели.\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА : sudo -u airflow_deploy ./airflow_sync_dags.sh --copy dags/test_dir\n\n") +
         "\033[32m{}\033[0m".format("Запуск скрипта с ключом --dry-run:") + "\n"
         "    Выполняет пробный запуск (dry run) без фактической синхронизации файлов. Показывает, какие изменения будут произведены, но не вносит их. Полезно для проверки перед реальным деплоем.\n"
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --dry-run\n\n") +
         "\033[32m{}\033[0m".format("Запуск скрипта с ключом -v:") + "\n"
         "    Включает подробный (verbose) режим вывода. Скрипт будет выводить дополнительную отладочную информацию о выполняемых действиях и командах.\n"
-        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n")
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --exclude:") + "\n"
+        "    Исключает указанные файлы или директории из синхронизации.\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --exclude .tmp,txt\n\n")
     )
     print(help_text)
     sys.exit(0)
