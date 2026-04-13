@@ -221,6 +221,25 @@ def save_log(message: str,
         if info_level:
             logger.info(message)
 
+def directory_check(path: str)-> None:
+    """Проверяет существование и тип пути. Если путь не существует или не является директорией,
+    логирует ошибку и завершает выполнение."""
+    save_log(f"Проверка наличия директории: {path}")
+    if not os.path.exists(path):
+        save_log(f"Директория источника не найдена: {path}", with_exit=True)
+    if not os.path.isdir(path):
+        save_log(f"Путь источника не является директорией: {path}", with_exit=True)
+
+
+def file_check(path: str) -> None:
+    """Проверяет существование и тип пути. Если путь не существует или не является файлом,
+    логирует ошибку и завершает выполнение."""
+    save_log(f"Проверка наличия файла: {path}")
+    if not os.path.exists(path):
+        save_log(f"Файл источника не найден: {path}", with_exit=True)
+    if not os.path.isfile(path):
+        save_log(f"Путь источника не является файлом: {path}", with_exit=True)
+
 @log_exceptions(log_message="Ошибка при определении имени пользователя")
 def check_real_user() -> str|None:
     """
@@ -416,15 +435,15 @@ def get_chmod_string(path: str) -> str:
     return CHMOD_FG_FU_FO_STRING
 
 
-@log_exceptions(log_message="Ошибка при деплое файлов/директорий")
+@log_exceptions(log_message="Ошибка при деплое файлов")
 def check_param_file_key(
     paths: list[str]
     ) -> None:
     """
-    Универсальная функция деплоя файла/директории на все хосты для one-way и cluster.
+    Универсальная функция деплоя файла на все хосты для one-way и cluster.
 
     Аргументы:
-        paths (list[str]): Список путей к файлам/директориям для деплоя (относительно AIRFLOW_DEPLOY_PATH).
+        paths (list[str]): Список путей к файлам для деплоя (относительно AIRFLOW_DEPLOY_PATH).
     """
     save_log(f"Запуск деплоя файлов: {paths}")
     for path in paths:
@@ -432,8 +451,7 @@ def check_param_file_key(
         temp_folder_path = path.rpartition("/")[0]
 
         save_log(f"Проверка наличия файла для деплоя: {airflow_deploy_dir_path}")
-        if not os.path.exists(airflow_deploy_dir_path):
-            save_log(f"Файл не найден для деплоя: {airflow_deploy_dir_path}", with_exit=True)
+        file_check(airflow_deploy_dir_path)
         
         chmod_string = get_chmod_string(path)
         hosts = get_hosts()
@@ -566,6 +584,7 @@ def check_param_dir_key(
     for path in paths:
         temp_folder_path = path.rpartition("/")[0]
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{path}"
+        directory_check(airflow_deploy_dir_path)
         save_log(f"{current_datetime} {real_name} Проверка наличия директории для деплоя: {airflow_deploy_dir_path}")
         if not os.path.exists(airflow_deploy_dir_path):
             save_log(f"{current_datetime} {real_name} Директория не найдена {airflow_deploy_dir_path} \n\n",
@@ -646,9 +665,7 @@ def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = N
     save_log(f"Запуск синхронизации с удалением (--copy) для путей: {paths}", info_level=True)
     for path in paths:
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{path}"
-        if not os.path.exists(airflow_deploy_dir_path):
-            save_log(f"Директория источника не найдена: {airflow_deploy_dir_path}", with_exit=True)
-
+        directory_check(airflow_deploy_dir_path)
         chmod_string = get_chmod_string(path)
         exclude_args = ""
         if exclude_exts:
