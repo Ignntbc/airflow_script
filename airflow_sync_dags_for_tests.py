@@ -14,7 +14,7 @@ from typing import List, Optional, Literal
 
 CRITICAL_DISK_USAGE_PERCENT = 80
 
-ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude"]
+ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--copy"]
 
 
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtpO --rsync-path="mkdir -p'
