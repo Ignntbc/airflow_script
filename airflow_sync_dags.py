@@ -11,7 +11,7 @@ from datetime import datetime
 
 
 CRITICAL_DISK_USAGE_PERCENT = 80
-ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--copy"] 
+ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--copy"]
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtpO --rsync-path="mkdir -p'
 RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtpO --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
