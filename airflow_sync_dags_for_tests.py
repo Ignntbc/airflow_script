@@ -27,12 +27,11 @@ AIRFLOW_PATH = "/app/airflow/"
 AIRFLOW_DEPLOY_PATH = "/app/airflow_deploy/"
 LOCAL_DEPLOY = "airflow_deploy@127.0.0.1"
 SSH_USER = "ssh airflow_deploy"
-CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo=" 
-# CHMOD_WITHOUT_DO_FU_DG_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=,Fg=,Fu=,Fo="
+CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo="
 
 VERBOSE = "-v" in sys.argv
 
-LOCAL_TEST = True
+LOCAL_TEST = False
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 
@@ -53,7 +52,7 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     Конфликтующие ключи: "--file", "--delete", "--dir", "-c". Любой из них не может быть с другим.
     Возвращает True, если комбинация разрешена, иначе False.
     """
-    conflict_keys = {"--file", "--delete", "--dir", "-c"}
+    conflict_keys = {"--file", "--delete", "--dir", "-c", "--copy"}
     found = [k for k in keys if k in conflict_keys]
     # Если найдено больше одного конфликтного ключа — запрещено
     if len(found) > 1:
@@ -632,6 +631,50 @@ def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
     save_log("Полная синхронизация всех папок завершена успешно", info_level=True)
 
 
+@log_exceptions(log_message="Ошибка при синхронизации с удалением (--copy)")
+def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+    """
+    Синхронизирует папку источника с целевой папкой на всех хостах (rsync --delete).
+    - Новые и обновлённые файлы копируются в целевую папку.
+    - Файлы, отсутствующие в источнике, удаляются в целевой папке.
+    Итог: целевая папка становится точной копией исходной.
+
+    Аргументы:
+        paths (list[str]): Список путей к директориям для синхронизации (относительно AIRFLOW_DEPLOY_PATH).
+        exclude_exts (Optional[list[str]]): Список расширений файлов для исключения из синхронизации.
+    """
+    save_log(f"Запуск синхронизации с удалением (--copy) для путей: {paths}", info_level=True)
+    for path in paths:
+        airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{path}"
+        if not os.path.exists(airflow_deploy_dir_path):
+            save_log(f"Директория источника не найдена: {airflow_deploy_dir_path}", with_exit=True)
+
+        chmod_string = get_chmod_string(path)
+        exclude_args = ""
+        if exclude_exts:
+            exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
+
+        for host in all_hosts:
+            host_prefix = f"airflow_deploy@{host}:"
+            save_log(
+                f"Синхронизация с удалением: {airflow_deploy_dir_path} -> {host}:{AIRFLOW_PATH}{path}",
+                info_level=True
+            )
+            rsync_command = (
+                f"{RSYNC_CHECKSUM} --delete {exclude_args} {CHOWN_STRING} {chmod_string} "
+                f"{airflow_deploy_dir_path}/ {host_prefix}{AIRFLOW_PATH}{path}"
+            )
+            run_command_with_log(
+                rsync_command,
+                f"Синхронизация с удалением: {AIRFLOW_PATH}{path} на хосте {host}",
+            )
+            save_log(
+                f"Синхронизация с удалением завершена: {airflow_deploy_dir_path} на хосте {host}",
+                info_level=True
+            )
+
+    save_log("Синхронизация с удалением (--copy) завершена успешно", info_level=True)
+
 
 @log_exceptions(log_message="Ошибка при обработке параметров командной строки")
 def check_param_run(keys: list[str],
@@ -656,6 +699,7 @@ def check_param_run(keys: list[str],
         "--delete": lambda: check_param_delete_key(paths),
         "--file": lambda: check_param_file_key(paths),
         "--dir": lambda: check_param_dir_key(paths, exclude_exts),
+        "--copy": lambda: check_param_copy_key(paths, exclude_exts),
         "-c":  lambda: remove_destination_folders(exclude_exts),
         "--dry-run": check_rsync_host,
         "": lambda: check_full_sync(exclude_exts),
@@ -1112,7 +1156,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
             paths.append(f"{folder}")
 
     
-    elif (keys == ["--dry-run"] or "-c" in keys) and paths == []:
+    elif (keys == ["--dry-run"] or "-c" in keys or "--copy" in keys) and paths == []:
         for folder in list_folders:
             paths.append(f"{folder}")
 

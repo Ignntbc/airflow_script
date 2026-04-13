@@ -1,4 +1,3 @@
-import shutil
 import os
 from collections.abc import Callable
 import json
@@ -12,7 +11,7 @@ from datetime import datetime
 
 
 CRITICAL_DISK_USAGE_PERCENT = 80
-ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude"]
+ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--copy"] 
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtpO --rsync-path="mkdir -p'
 RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtpO --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
@@ -24,10 +23,9 @@ AIRFLOW_DEPLOY_PATH = "{{ airflow_deploy_dir.path }}/"
 DESCRIPTION_JSON = "{{ description_dir.path }}/description.json"
 LOCAL_DEPLOY = "{{ airflow_deploy_suz_account.user }}@127.0.0.1"
 SSH_USER = "ssh {{ airflow_deploy_suz_account.user }}"
-CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=,Fo="
+CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=r,Fo="
 VERBOSE = "-v" in sys.argv
 LOCAL_TEST = False
-
 LOG_DIR = "{{ airflow_deploy_log_dir.path }}"
 LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy.log')
 LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
@@ -53,14 +51,12 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     Конфликтующие ключи: "--file", "--delete", "--dir", "-c". Любой из них не может быть с другим.
     Возвращает True, если комбинация разрешена, иначе False.
     """
-    conflict_keys = {"--file", "--delete", "--dir", "-c"}
+    conflict_keys = {"--file", "--delete", "--dir", "-c", "--copy"}
     found = [k for k in keys if k in conflict_keys]
-    # Если найдено больше одного конфликтного ключа — запрещено
     if len(found) > 1:
         return False
     if ("--delete" in found or "--file" in found) and "--exclude" in keys:
         return False
-    # Остальные ключи разрешены в любых сочетаниях
     return True
 
 
@@ -76,36 +72,6 @@ schedulers = data_description["software"]["app"]["nodes"]["airflow_scheduler"]
 webs = data_description["software"]["app"]["nodes"]["airflow_web"]
 workers = data_description["software"]["app"]["nodes"].get("airflow_workers",[])
 all_hosts = schedulers + webs + workers
-
-def check_configuration(executor_type: str) -> str:
-    """
-    Определяет тип конфигурации Airflow по типу executor.
-
-    Аргументы:
-        executor_type (str): Тип executor из конфигурационного файла
-        (например, 'localexecutor' или 'celeryexecutor').
-
-    Возвращает:
-        str: Строка с типом конфигурации 
-        ('one-way' для localexecutor, 'cluster' для остальных типов).
-    """
-    if executor_type == "localexecutor":
-        config = "one-way"
-    else:
-        config = "cluster"
-    return config
-
-EXECUTOR_TYPE = data_description["software"]["app"]["executor"]
-CONFIGURATION= check_configuration(EXECUTOR_TYPE)
-
-def get_hosts() -> list:
-    """
-    Возвращает список хостов в зависимости от конфигурации.
-    Для one-way — только localhost, иначе all_hosts.
-    """
-    if CONFIGURATION == "one-way":
-        return ["127.0.0.1"]
-    return all_hosts
 
 
 def log_exceptions(log_message: str, context_arg_name: Optional[str] = None):
@@ -137,9 +103,6 @@ def log_exceptions(log_message: str, context_arg_name: Optional[str] = None):
                 return None
         return wrapper
     return decorator
-
-
-
 
 
 def file_size(path):
@@ -186,12 +149,10 @@ def setup_logger() -> logging.Logger:
     logger_obj.setLevel(level)
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 
-    # stdout handler
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(formatter)
     logger_obj.addHandler(sh)
 
-    # file handler (всегда пишем в LOG_FILE_1)
     fh = logging.FileHandler(LOG_FILE_1, mode='a', encoding='utf-8')
     fh.setFormatter(formatter)
     logger_obj.addHandler(fh)
@@ -409,32 +370,18 @@ def check_param_delete_key(
 
     for i_script_args in paths:
         path = f"{AIRFLOW_PATH}{i_script_args}"
-        if CONFIGURATION == "one-way":
+        for host in all_hosts:
             try:
-                if os.path.isfile(path):
-                    os.remove(path)
-                    save_log(f"Удалён файл: {path}", info_level=True)
-                elif os.path.isdir(path):
-                    shutil.rmtree(path)
-                    save_log(f"Удалена директория: {path}", info_level=True)
+                run_command_with_log(
+                    f"{SSH_USER}@{host} rm -rf {path}", 
+                    f"Удаление файла/директории: {path} на хосте {host}"
+                )
+                save_log(f"Удалён файл/директория: {path} на хосте {host}", info_level=True)
             except Exception as e:
                 save_log(
-                    f"{current_datetime} {real_name} Ошибка при удалении {path}: {str(e)}",
+                    f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}", 
                     with_exit=True
                 )
-        else:
-            for host in all_hosts:
-                try:
-                    run_command_with_log(
-                        f"{SSH_USER}@{host} rm -rf {path}", 
-                        f"Удаление файла/директории: {path} на хосте {host}"
-                    )
-                    save_log(f"Удалён файл/директория: {path} на хосте {host}", info_level=True)
-                except Exception as e:
-                    save_log(
-                        f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}", 
-                        with_exit=True
-                    )
 
     save_log("Удаление файлов/директорий завершено успешно", info_level=True)
     sys.exit(0)
@@ -455,7 +402,7 @@ def check_param_file_key(
     paths: list[str]
     ) -> None:
     """
-    Универсальная функция деплоя файла/директории на все хосты для one-way и cluster.
+    Универсальная функция деплоя файла/директории на все хосты для cluster.
 
     Аргументы:
         paths (list[str]): Список путей к файлам/директориям для деплоя 
@@ -471,8 +418,7 @@ def check_param_file_key(
             save_log(f"Файл не найден для деплоя: {airflow_deploy_dir_path}", with_exit=True)
 
         chmod_string = get_chmod_string(path)
-        hosts = get_hosts()
-        for host in hosts:
+        for host in all_hosts:
             host_prefix = f"airflow_deploy@{host}:"
             save_log(
                 f"Запуск rsync для деплоя файла: {airflow_deploy_dir_path} на хосте {host}", 
@@ -534,8 +480,7 @@ def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None
     Для папки dags пропускает каталоги __pycache__, для остальных удаляет все элементы.
     """
     save_log("Запуск очистки целевых папок на удалённых хостах airflow_deploy через ssh", info_level=True)
-    hosts = get_hosts()
-    for host_name in hosts:
+    for host_name in all_hosts:
         save_log(f"Очистка на хосте: {host_name}", info_level=True)
         for elem in LIST_FOLDERS:
             remote_delete_items(elem, host_name, exclude_exts)
@@ -591,7 +536,7 @@ def check_param_h_key() -> None:
 @log_exceptions(log_message="Ошибка при деплое директорий")
 def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
     """
-    Универсальная функция деплоя директории на все хосты для one-way и cluster.
+    Универсальная функция деплоя директории на все хосты для cluster.
 
     Аргументы:
         paths (list[str]): Список путей к директориям для деплоя (относительно AIRFLOW_DEPLOY_PATH).
@@ -609,7 +554,6 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
             save_log(f"{current_datetime} {real_name} Директория не найдена {airflow_deploy_dir_path}",
                     with_exit=True)
 
-        hosts = get_hosts()
         host_prefix = "airflow_deploy@{host}:"
 
         chmod_string = get_chmod_string(path)
@@ -619,7 +563,7 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
         if exclude_exts:
             exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
 
-        for host in hosts:
+        for host in all_hosts:
             if path.count("/") > 1:
                 rsync_command = (
                     f'rsync --checksum -rogtpO --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
@@ -628,15 +572,15 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
                 )
                 run_command_with_log(
                     rsync_command,
-                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}",
+                    f"{current_datetime} {real_name} {host} Добавлена директория:  {AIRFLOW_PATH}{path}",
                 )
-                save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}", info_level=True)
+                save_log(f"{current_datetime} {real_name} {host} Директория успешно скопирована: {airflow_deploy_dir_path}", info_level=True)
             else:
                 run_command_with_log(
                     f"{RSYNC_CHECKSUM} {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}",
-                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}",
+                    f"{current_datetime} {real_name} {host} Добавлена директория:  {AIRFLOW_PATH}{path}",
                 )
-                save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}", info_level=True)
+                save_log(f"{current_datetime} {real_name} {host} Директория успешно скопирована: {airflow_deploy_dir_path}", info_level=True)
 
 
 @log_exceptions(log_message="Ошибка при полной синхронизации папок", context_arg_name="folder")
@@ -647,7 +591,6 @@ def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
     для остальных CHMOD_FG_FU_FO_STRING.
     """
     save_log("Запуск полной синхронизации всех папок из LIST_FOLDERS", info_level=True)
-    hosts = get_hosts()
     exclude_args = ""
     if exclude_exts:
         exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
@@ -655,7 +598,7 @@ def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
     for folder in LIST_FOLDERS:
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{folder}"
         chmod_string = get_chmod_string(folder)
-        for host in hosts:
+        for host in all_hosts:
             host_prefix = f"airflow_deploy@{host}:"
             save_log(f"Синхронизация папки: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
             try:
@@ -667,6 +610,51 @@ def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
             except Exception as e:
                 save_log(f"Ошибка копирования папки {airflow_deploy_dir_path} на хост {host}: {str(e)}", with_exit=True)
     save_log("Полная синхронизация всех папок завершена успешно", info_level=True)
+
+
+@log_exceptions(log_message="Ошибка при синхронизации с удалением (--copy)")
+def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+    """
+    Синхронизирует папку источника с целевой папкой на всех хостах (rsync --delete).
+    - Новые и обновлённые файлы копируются в целевую папку.
+    - Файлы, отсутствующие в источнике, удаляются в целевой папке.
+    Итог: целевая папка становится точной копией исходной.
+
+    Аргументы:
+        paths (list[str]): Список путей к директориям для синхронизации (относительно AIRFLOW_DEPLOY_PATH).
+        exclude_exts (Optional[list[str]]): Список расширений файлов для исключения из синхронизации.
+    """
+    save_log(f"Запуск синхронизации с удалением (--copy) для путей: {paths}", info_level=True)
+    for path in paths:
+        airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{path}"
+        if not os.path.exists(airflow_deploy_dir_path):
+            save_log(f"Директория источника не найдена: {airflow_deploy_dir_path}", with_exit=True)
+
+        chmod_string = get_chmod_string(path)
+        exclude_args = ""
+        if exclude_exts:
+            exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
+
+        for host in all_hosts:
+            host_prefix = f"airflow_deploy@{host}:"
+            save_log(
+                f"Синхронизация с удалением: {airflow_deploy_dir_path} -> {host}:{AIRFLOW_PATH}{path}",
+                info_level=True
+            )
+            rsync_command = (
+                f"{RSYNC_CHECKSUM} --delete {exclude_args} {CHOWN_STRING} {chmod_string} "
+                f"{airflow_deploy_dir_path}/ {host_prefix}{AIRFLOW_PATH}{path}"
+            )
+            run_command_with_log(
+                rsync_command,
+                f"Синхронизация с удалением: {AIRFLOW_PATH}{path} на хосте {host}",
+            )
+            save_log(
+                f"Синхронизация с удалением завершена: {airflow_deploy_dir_path} на хосте {host}",
+                info_level=True
+            )
+
+    save_log("Синхронизация с удалением (--copy) завершена успешно", info_level=True)
 
 
 @log_exceptions(log_message="Ошибка при обработке параметров командной строки")
@@ -690,6 +678,7 @@ def check_param_run(keys: list[str], paths: list[str], exclude_exts: Optional[li
         "--delete": lambda: check_param_delete_key(paths),
         "--file": lambda: check_param_file_key(paths),
         "--dir": lambda: check_param_dir_key(paths, exclude_exts),
+        "--copy": lambda: check_param_copy_key(paths, exclude_exts),
         "-c": lambda: remove_destination_folders(exclude_exts),
         "--dry-run": check_rsync_host,
         "": lambda: check_full_sync(exclude_exts)
@@ -760,7 +749,7 @@ def check_permission_type(
     save_log(f"Запуск проверки прав доступа для {folder} на хосте {host}")
     folder_name = os.path.basename(folder.rstrip('/'))
     if folder_name in ("keys", "keytab"):
-        perm_cmd = f"{SSH_USER}@{host} find {folder} -type f ! -perm 0600"
+        perm_cmd = f"{SSH_USER}@{host} find {folder} -type f ! -perm 0640"
     else:
         perm_cmd = f"{SSH_USER}@{host} find {folder} -type d ! -perm 0755 ! -perm 0775"
 
@@ -786,20 +775,13 @@ def check_groups_users(host: str) -> None:
     save_log(f"Запуск проверки групп и владельцев на хосте: {host}")
     for folder in LIST_FOLDERS:
         dir_path = f"{AIRFLOW_PATH}{folder}"
-        if CONFIGURATION == "cluster":
-            save_log(f"Проверка группы для директории: {dir_path} на хосте {host}")
-            find_group_cmd = f"{SSH_USER}@{host} find {dir_path} ! -group airflow"
-            check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа на хосте", host)
-            save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-            find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow ! -user airflow_deploy"
-            check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец на хосте", host)
-        else:
-            save_log(f"Проверка группы для директории: {dir_path} на хосте {host}")
-            find_group_cmd = f"find {dir_path} ! -group airflow_deploy ! -group airflow"
-            check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа", host)
-            save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-            find_user_cmd = f"find {dir_path} ! -user airflow ! -user airflow_deploy"
-            check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец", host)
+        save_log(f"Проверка группы для директории: {dir_path} на хосте {host}")
+        find_group_cmd = f"{SSH_USER}@{host} find {dir_path} ! -group airflow"
+        check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа на хосте", host)
+        save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
+        find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow ! -user airflow_deploy"
+        check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец на хосте", host)
+        
     save_log(f"Результат проверки групп и владельцев на хосте {host}: завершено без ошибок")
 
 
@@ -1065,8 +1047,7 @@ def check_rsync_host() -> None:
     """
     Проверяет возможность синхронизации директорий с помощью rsync на указанный хост.
     """
-    hosts = get_hosts()
-    for host_name in hosts:
+    for host_name in all_hosts:
         save_log(f"Запуск проверки запуска rsync на хосте: {host_name}")
         for folder in LIST_FOLDERS:
             try:
@@ -1144,7 +1125,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         for folder in LIST_FOLDERS:
             paths.append(f"{folder}")
     
-    elif (keys == ["--dry-run"] or "-c" in keys) and paths == []:
+    elif (keys == ["--dry-run"] or "-c" in keys or "--copy" in keys) and paths == []:
         for folder in LIST_FOLDERS:
             paths.append(f"{folder}")
 
@@ -1175,7 +1156,6 @@ def timer_setup(seconds: int = 300,
 def main() -> None:
     """
     Основная функция скрипта, выполняющая синхронизацию директорий и проверку параметров.
-    В зависимости от конфигурации (one-way или cluster) выполняет соответствующие действия.
     """
     save_log("Начало работы скрипта", info_level=True)
     paths, keys, exclude_exts = parse_args(sys.argv)
@@ -1191,22 +1171,18 @@ def main() -> None:
 
     param_run_script(keys)
     check_files_in_dirs()
-    hosts = get_hosts()
-    if CONFIGURATION == "one-way":
-        host_checks(current_hostname, paths, keys, exclude_exts)
 
-    if CONFIGURATION == "cluster":
-        for hostname in all_hosts:
-            host_checks(hostname, paths, keys, exclude_exts)
+    for hostname in all_hosts:
+        host_checks(hostname, paths, keys, exclude_exts)
 
 
     check_param_run(keys, paths, exclude_exts)
     if any(key in keys for key in ["--dir", "--file", "-c", ""]):
-        ok_status = check_hashes(paths, hosts, exclude_exts)
+        ok_status = check_hashes(paths, all_hosts, exclude_exts)
         if not ok_status:
             save_log("Ошибка: fingerprints не совпали после синхронизации", with_exit=True)
 
-    save_log(f"Синхронизация завершена успешно для {hosts} хостов", info_level=True)
+    save_log(f"Синхронизация завершена успешно для {len(all_hosts)} хостов", info_level=True)
 
     sys.exit(0)
 
