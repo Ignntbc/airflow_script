@@ -821,8 +821,14 @@ def get_stdout_from_cmd(cmd: str) -> str:
     """Выполняет shell-команду и возвращает stdout как строку (без лишних пробелов)."""
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
     if result.returncode != 0:
-        save_log(f"[get_stdout_from_cmd] Ошибка выполнения команды: {cmd}\nStderr: {result.stderr.strip()}", with_exit=True)
-        raise RuntimeError(f"Ошибка выполнения команды: {cmd}\nStderr: {result.stderr.strip()}")
+        stderr_text = result.stderr.strip() or "<empty>"
+        stdout_text = result.stdout.strip() or "<empty>"
+        error_message = (
+            f"[get_stdout_from_cmd] Ошибка выполнения команды: {cmd}; "
+            f"returncode={result.returncode}; stderr={stderr_text}; stdout={stdout_text}"
+        )
+        save_log(error_message, with_exit=True)
+        raise RuntimeError(error_message)
     return result.stdout.strip()
 
 def get_freed_space_by_delete(full_paths: list[str], data_host: str):
@@ -836,7 +842,7 @@ def get_freed_space_by_delete(full_paths: list[str], data_host: str):
         remote_find_cmd = (
             SSH_USER + "@" + data_host +
             " 'find " + AIRFLOW_PATH + rel_path +
-            " -type f -exec stat -c \"%s\" {} \\; 2>/dev/null'"
+            " -type f -exec stat -c \"%s\" {} \\;'"
         )
         try:
             remote_out = get_stdout_from_cmd(remote_find_cmd)
@@ -877,7 +883,7 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
     remote_find_cmd = (
         SSH_USER + "@" + data_host +
         " 'find " + AIRFLOW_PATH +
-        " -type f -exec stat -c \"%n %s\" {} \\; 2>/dev/null'"
+        " -type f -exec stat -c \"%n %s\" {} \\;'"
     )
     remote_files = {}
     try:

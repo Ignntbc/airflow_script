@@ -16,13 +16,14 @@ sudo -u airflow_deploy /app/airflow_deploy/airflow_sync_dags.sh
 Запуск напрямую (без оболочки):
 sudo -u airflow_deploy python3 /app/airflow_deploy/airflow_sync_dags.py [опции]
 
-Usage: airflow_sync_dags.sh [-c] [-h] [-v] [--dry-run] [--delete] [--file] [--dir] [--exclude]
+Usage: airflow_sync_dags.sh [-c] [-h] [-v] [--dry-run] [--delete] [--file] [--dir] [--copy] [--exclude]
 
 
 Описание ключей:
 --delete   Удалить указанный файл или директорию из целевой папки (например, из /app/airflow/dags и других поддерживаемых директорий).
 --file     Операция применяется к отдельному файлу.
 --dir      Операция применяется к директории.
+--copy     Тиражирование директории с приведением целевой директории к точной копии источника (аналог rsync --delete).
 -c         Операция применяется ко всем стандартным директориям в app/airflow.
 -h         Вывести справку по использованию скрипта.
 -v         Включить подробный (verbose) режим вывода.
@@ -38,19 +39,3 @@ sudo -u airflow_deploy python3 /app/airflow_deploy/airflow_sync_dags.py --dry-ru
 python3 /app/airflow_deploy/airflow_sync_dags.py --file dags/test dags/test_2
 
 В процессе работы ведется лог аудита (для просмотра: cat /app/airflow_deploy/log/deploy.log)
-
-Матрица конфликтов ключей
-+ конфликт
-- допустимо
-
-
-          |   h   |   c   |  dir  | file  | delete |  v   | dry-run | exclude
----------------------------------------------------------------------------------
-h         |   x   |   +   |   +   |   +   |   +    |  +   |    +    |   +
-c         |   +   |   x   |   +   |   +   |   +    |  -   |    -    |   -
-dir       |   +   |   +   |   x   |   +   |   +    |  -   |    -    |   -
-file      |   +   |   +   |   +   |   x   |   +    |  -   |    -    |   +
-delete    |   +   |   +   |   +   |   +   |   x    |  -   |    -    |   +
-v         |   +   |   -   |   -   |   -   |   -    |  x   |    -    |   -
-dry-run   |   +   |   -   |   -   |   -   |   -    |  -   |    x    |   -
-exclude   |   +   |   -   |   -   |   -   |   -    |  -   |    -    |   x
