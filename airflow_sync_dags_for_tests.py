@@ -875,7 +875,7 @@ def get_freed_space_by_delete(full_paths: list[str], data_host: str):
         remote_find_cmd = (
             SSH_USER + "@" + data_host +
             " 'find " + AIRFLOW_PATH + rel_path +
-            " -type f -exec stat -c \"%s\" {} \\'"
+            " -type f -exec stat -c \"%s\" {} \\;'"
         )
         try:
             remote_out = get_stdout_from_cmd(remote_find_cmd)
@@ -916,7 +916,7 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
     remote_find_cmd = (
         SSH_USER + "@" + data_host +
         " 'find " + AIRFLOW_PATH +
-        " -type f -exec stat -c \"%n %s\" {} \\'"
+        " -type f -exec stat -c \"%n %s\" {} \\;'"
     )
     remote_files = {}
     try:
@@ -1030,7 +1030,7 @@ def get_remote_fingerprint_hashes(host: str, path: str, is_dir: bool) -> dict[st
         remote_stat_cmd = (
             SSH_USER + "@" + host +
             " 'find " + AIRFLOW_PATH + path +
-            " -type f -exec stat -c \"%n %Y-%s\" {} \\'"
+            " -type f -exec stat -c \"%n %Y-%s\" {} \\;'"
         )
     else:
         remote_stat_cmd = (

@@ -996,12 +996,12 @@ def get_remote_fingerprint_hashes(host: str, path: str, is_dir: bool) -> dict[st
         remote_stat_cmd = (
             SSH_USER + "@" + host +
             " 'find " + AIRFLOW_PATH + path +
-            " -type f -exec stat -c \"%n %Y-%s\" {} \\; 2>/dev/null'"
+            " -type f -exec stat -c \"%n %Y-%s\" {} \\;'"
         )
     else:
         remote_stat_cmd = (
             f"{SSH_USER}@{host} "
-            f"'stat -c \"%n %Y-%s\" {AIRFLOW_PATH}{path} 2>/dev/null'"
+            f"'stat -c \"%n %Y-%s\" {AIRFLOW_PATH}{path}'"
         )
     try:
         remote_out = get_stdout_from_cmd(remote_stat_cmd)
