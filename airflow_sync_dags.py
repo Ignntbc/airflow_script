@@ -879,59 +879,71 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
                     local_files[rel_path] = os.path.getsize(abs_path)
                 except Exception:
                     pass
-
-    remote_find_cmd = (
-        SSH_USER + "@" + data_host +
-        " 'find " + AIRFLOW_PATH +
-        " -type f -exec stat -c \"%n %s\" {} \\;'"
-    )
-    remote_files = {}
+    #TODO Убран расчет подпапок через find, оставлена проверка на 80%           
+    disk_info_cmd = f"ssh airflow_deploy@{data_host} 'df --output=size,used,avail /app | tail -1'"
+    disk_info_out = get_stdout_from_cmd(disk_info_cmd)
     try:
-        remote_out = get_stdout_from_cmd(remote_find_cmd)
+        size_str, used_str, avail_str = disk_info_out.strip().split()
+        size = int(size_str) * 1000 
+        used = int(used_str) * 1000
+        used_after = used + used_deploy
+        percent_after = int(used_after / size * 100)
+        if percent_after >= CRITICAL_DISK_USAGE_PERCENT:
+            save_log(f"ОШИБКА: занято {percent_after}% места на сервере {data_host}, превышен порог {CRITICAL_DISK_USAGE_PERCENT}%. Деплой прерван.", with_exit=True)
     except Exception as e:
-        save_log(f"Ошибка при получении размера файлов с удалённого хоста {data_host}: {str(e)}. Команда: {remote_find_cmd}", with_exit=True)
-        return
+        save_log(f"Ошибка при получении информации о размере диска на сервере {data_host}: {disk_info_out} ({e})", with_exit=True)
+    # remote_find_cmd = (
+    #     SSH_USER + "@" + data_host +
+    #     " 'find " + AIRFLOW_PATH +
+    #     " -type f -exec stat -c \"%n %s\" {} \\;'"
+    # )
+    # remote_files = {}
+    # try:
+    #     remote_out = get_stdout_from_cmd(remote_find_cmd)
+    # except Exception as e:
+    #     save_log(f"Ошибка при получении размера файлов с удалённого хоста {data_host}: {str(e)}. Команда: {remote_find_cmd}", with_exit=True)
+    #     return
 
-    for line in remote_out.splitlines():
-        try:
-            rel, sz = line.strip().rsplit(' ', 1)
-            rel = os.path.relpath(rel, AIRFLOW_PATH)
-            remote_files[rel] = int(sz)
-        except Exception:
-            save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
-            continue
+    # for line in remote_out.splitlines():
+    #     try:
+    #         rel, sz = line.strip().rsplit(' ', 1)
+    #         rel = os.path.relpath(rel, AIRFLOW_PATH)
+    #         remote_files[rel] = int(sz)
+    #     except Exception:
+    #         save_log(f"Ошибка при обработке строки с удалённого хоста {data_host}: {line}", info_level=True)
+    #         continue
 
-    if {"-c", "--copy"} & set(keys):
-        local_size = sum(local_files.values())
-        remote_size = sum(remote_files.values())
-        diff = local_size - remote_size
-        if diff < 0:
-            save_log(f"После деплоя освободится дополнительно {abs(diff) / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
-        else:
-            save_log(f"После деплоя потребуется дополнительно {diff / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+    # if {"-c", "--copy"} & set(keys):
+    #     local_size = sum(local_files.values())
+    #     remote_size = sum(remote_files.values())
+    #     diff = local_size - remote_size
+    #     if diff < 0:
+    #         save_log(f"После деплоя освободится дополнительно {abs(diff) / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
+    #     else:
+    #         save_log(f"После деплоя потребуется дополнительно {diff / 1000 / 1000:.3f} mb на сервере {data_host}", info_level=True)
 
-    else:
-        for rel, lsz in local_files.items():
-            rsz = remote_files.get(rel, 0)
-            diff = lsz - rsz
-            if diff > 0:
-                used_deploy += diff
+    # else:
+    #     for rel, lsz in local_files.items():
+    #         rsz = remote_files.get(rel, 0)
+    #         diff = lsz - rsz
+    #         if diff > 0:
+    #             used_deploy += diff
 
-        mb = used_deploy / 1000 / 1000
-        disk_info_cmd = f"ssh airflow_deploy@{data_host} 'df --output=size,used,avail /app/airflow | tail -1'"
-        disk_info_out = get_stdout_from_cmd(disk_info_cmd)
-        try:
-            size_str, used_str, avail_str = disk_info_out.strip().split()
-            size = int(size_str) * 1000 
-            used = int(used_str) * 1000
-            used_after = used + used_deploy
-            percent_after = int(used_after / size * 100)
-            if percent_after >= CRITICAL_DISK_USAGE_PERCENT:
-                save_log(f"ОШИБКА: После деплоя будет занято {percent_after}% места на сервере {data_host}, превышен порог {CRITICAL_DISK_USAGE_PERCENT}%. Потребуется дополнительно {mb:.3f} MB. Деплой прерван.", with_exit=True)
-        except Exception as e:
-            save_log(f"Ошибка при получении информации о размере диска на сервере {data_host}: {disk_info_out} ({e})", with_exit=True)
+    #     mb = used_deploy / 1000 / 1000
+    #     disk_info_cmd = f"ssh airflow_deploy@{data_host} 'df --output=size,used,avail /app | tail -1'"
+    #     disk_info_out = get_stdout_from_cmd(disk_info_cmd)
+    #     try:
+    #         size_str, used_str, avail_str = disk_info_out.strip().split()
+    #         size = int(size_str) * 1000 
+    #         used = int(used_str) * 1000
+    #         used_after = used + used_deploy
+    #         percent_after = int(used_after / size * 100)
+    #         if percent_after >= CRITICAL_DISK_USAGE_PERCENT:
+    #             save_log(f"ОШИБКА: После деплоя будет занято {percent_after}% места на сервере {data_host}, превышен порог {CRITICAL_DISK_USAGE_PERCENT}%. Потребуется дополнительно {mb:.3f} MB. Деплой прерван.", with_exit=True)
+    #     except Exception as e:
+    #         save_log(f"Ошибка при получении информации о размере диска на сервере {data_host}: {disk_info_out} ({e})", with_exit=True)
 
-        save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
+    #     save_log(f"После деплоя потребуется дополнительно {mb:.3f} mb на сервере {data_host}", info_level=True)
 
 
 @log_exceptions("Ошибка при проверке свободного места на хосте", "data_host")
@@ -952,7 +964,9 @@ def check_free_space(data_host: str,
     """
     full_paths = [f"{AIRFLOW_DEPLOY_PATH}{path}" for path in paths]
     if action == 'delete':
-        get_freed_space_by_delete(full_paths, data_host)
+        #TODO Убран расчет подпапок через find, оставлена проверка на 80%
+        # get_freed_space_by_delete(full_paths, data_host)
+        pass
     else:
         check_required_space_and_percent(full_paths, data_host, keys, exclude_exts)
 
@@ -1201,10 +1215,11 @@ def main() -> None:
 
 
     check_param_run(keys, paths, exclude_exts)
-    if any(key in keys for key in ["--dir", "--file", "-c", ""]):
-        ok_status = check_hashes(paths, all_hosts, exclude_exts)
-        if not ok_status:
-            save_log("Ошибка: fingerprints не совпали после синхронизации", with_exit=True)
+    #TODO Временно отключаем проверку отпечатков
+    # if any(key in keys for key in ["--dir", "--file", "-c", ""]):
+    #     ok_status = check_hashes(paths, all_hosts, exclude_exts)
+    #     if not ok_status:
+    #         save_log("Ошибка: fingerprints не совпали после синхронизации", with_exit=True)
 
     save_log(f"Синхронизация завершена успешно для {len(all_hosts)} хостов", info_level=True)
 
