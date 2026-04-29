@@ -11,7 +11,7 @@ from datetime import datetime
 
 
 CRITICAL_DISK_USAGE_PERCENT = 80
-ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--copy"]
+ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--exclude-dir", "--copy"]
 RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtpO --rsync-path="mkdir -p'
 RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtpO --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
@@ -55,7 +55,7 @@ def is_key_combination_allowed(keys: List[str]) -> bool:
     found = [k for k in keys if k in conflict_keys]
     if len(found) > 1:
         return False
-    if ("--delete" in found or "--file" in found) and "--exclude" in keys:
+    if ("--delete" in found or "--file" in found) and ("--exclude" in keys or "--exclude-dir" in keys):
         return False
     return True
 
@@ -459,7 +459,7 @@ def check_param_file_key(
 
 
 @log_exceptions(log_message="Ошибка при удалении содержимого директории", context_arg_name="host_name")
-def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[str]] = None) -> None:
+def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Удаляет все элементы в целевой директории на удалённом хосте.
     Для dags пропускает __pycache__, для остальных удаляет все элементы.
@@ -478,29 +478,34 @@ def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[s
                 continue
             if exclude_exts and ext in exclude_exts:
                 continue
+            if exclude_dirs and item in exclude_dirs:
+                continue
             result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/{item}", f"Удаление: {AIRFLOW_PATH}dags/{item} на хосте {host_name}", info_level=True)
             save_log(f"Результат удаления {AIRFLOW_PATH}dags/{item} на хосте {host_name}: {result.strip()}", info_level=True)
         result_sql = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/sql/*", f"Удаление SQL-файлов в директории dags/sql на хосте {host_name}", info_level=True)
         save_log(f"Результат удаления SQL-файлов на хосте {host_name}: {result_sql.strip()}", info_level=True)
     else:
         for item in items:
+            if exclude_dirs and item in exclude_dirs:
+                continue
             result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rf {AIRFLOW_PATH}{elem}/{item}", f"Удаление: {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}", info_level=True)
             save_log(f"Результат удаления {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}: {result.strip()}", info_level=True)
 
 
 @log_exceptions(log_message="Ошибка при очистке целевых папок")
-def remove_destination_folders(exclude_exts: Optional[list[str]] = None) -> None:
+def remove_destination_folders(exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Удаляет содержимое целевых папок на удалённом сервере airflow_deploy через ssh.
     Для папки dags пропускает каталоги __pycache__, для остальных удаляет все элементы.
     """
     save_log("Запуск очистки целевых папок на удалённых хостах airflow_deploy через ssh", info_level=True)
+    folders_to_clean = [f for f in LIST_FOLDERS if f not in (exclude_dirs or [])]
     for host_name in all_hosts:
         save_log(f"Очистка на хосте: {host_name}", info_level=True)
-        for elem in LIST_FOLDERS:
-            remote_delete_items(elem, host_name, exclude_exts)
+        for elem in folders_to_clean:
+            remote_delete_items(elem, host_name, exclude_exts, exclude_dirs)
     
-    check_full_sync(exclude_exts)
+    check_full_sync(exclude_exts, exclude_dirs)
 
     save_log("Очистка целевых папок на удалённых хостах завершена успешно", info_level=True)
 
@@ -545,15 +550,18 @@ def check_param_h_key() -> None:
         "    Включает подробный (verbose) режим вывода. Скрипт будет выводить дополнительную отладочную информацию о выполняемых действиях и командах.\n"
         "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh -v\n\n") +
         "\033[32m{}\033[0m".format("Запуск скрипта с ключом --exclude:") + "\n"
-        "    Исключает указанные файлы или директории из синхронизации.\n"
-        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --exclude .tmp,txt\n\n")
+        "    Исключает указанные файлы по расширению из синхронизации.\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --exclude .tmp,txt\n\n") +
+        "\033[32m{}\033[0m".format("Запуск скрипта с ключом --exclude-dir:") + "\n"
+        "    Исключает указанные директории из синхронизации и очистки.\n"
+        "\033[32m{}\033[0m".format("ПРИМЕР ЗАПУСКА: sudo -u airflow_deploy ./airflow_sync_dags.sh --exclude-dir __pycache__,logs\n\n")
     )
     print(help_text)
     sys.exit(0)
 
 
 @log_exceptions(log_message="Ошибка при деплое директорий")
-def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Универсальная функция деплоя директории на все хосты для cluster.
 
@@ -581,6 +589,8 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
 
         if exclude_exts:
             exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
+        if exclude_dirs:
+            exclude_args += ' ' + ' '.join([f'--exclude="{d}/"' for d in exclude_dirs])
 
         for host in all_hosts:
             if path.count("/") > 1:
@@ -603,18 +613,21 @@ def check_param_dir_key(paths: list[str], exclude_exts: Optional[list[str]] = No
 
 
 @log_exceptions(log_message="Ошибка при полной синхронизации папок", context_arg_name="folder")
-def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
+def check_full_sync(exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Переносит все папки из LIST_FOLDERS с нужными chmod.
     Для keytab и keys используется CHMOD_WITHOUT_FU_FO_STRING,
     для остальных CHMOD_FG_FU_FO_STRING.
     """
     save_log("Запуск полной синхронизации всех папок из LIST_FOLDERS", info_level=True)
+    folders_to_sync = [f for f in LIST_FOLDERS if f not in (exclude_dirs or [])]
     exclude_args = ""
     if exclude_exts:
         exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
+    if exclude_dirs:
+        exclude_args += ' ' + ' '.join([f'--exclude="{d}/"' for d in exclude_dirs])
 
-    for folder in LIST_FOLDERS:
+    for folder in folders_to_sync:
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{folder}"
         chmod_string = get_chmod_string(folder)
         for host in all_hosts:
@@ -632,7 +645,7 @@ def check_full_sync(exclude_exts: Optional[list[str]] = None) -> None:
 
 
 @log_exceptions(log_message="Ошибка при синхронизации с удалением (--copy)")
-def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Синхронизирует папку источника с целевой папкой на всех хостах (rsync --delete).
     - Новые и обновлённые файлы копируются в целевую папку.
@@ -652,6 +665,8 @@ def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = N
         exclude_args = ""
         if exclude_exts:
             exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
+        if exclude_dirs:
+            exclude_args += ' ' + ' '.join([f'--exclude="{d}/"' for d in exclude_dirs])
 
         for host in all_hosts:
             host_prefix = f"airflow_deploy@{host}:"
@@ -676,7 +691,7 @@ def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = N
 
 
 @log_exceptions(log_message="Ошибка при обработке параметров командной строки")
-def check_param_run(keys: list[str], paths: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def check_param_run(keys: list[str], paths: list[str], exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Обрабатывает параметры командной строки для управления синхронизацией и удалением файлов/директорий Airflow.
     Аргументы:
@@ -695,14 +710,14 @@ def check_param_run(keys: list[str], paths: list[str], exclude_exts: Optional[li
     key_func_map = {
         "--delete": lambda: check_param_delete_key(paths),
         "--file": lambda: check_param_file_key(paths),
-        "--dir": lambda: check_param_dir_key(paths, exclude_exts),
-        "--copy": lambda: check_param_copy_key(paths, exclude_exts),
-        "-c": lambda: remove_destination_folders(exclude_exts),
-        "--dry-run": check_rsync_host,
-        "": lambda: check_full_sync(exclude_exts)
+        "--dir": lambda: check_param_dir_key(paths, exclude_exts, exclude_dirs),
+        "--copy": lambda: check_param_copy_key(paths, exclude_exts, exclude_dirs),
+        "-c": lambda: remove_destination_folders(exclude_exts, exclude_dirs),
+        "--dry-run": lambda: check_rsync_host(exclude_dirs),
+        "": lambda: check_full_sync(exclude_exts, exclude_dirs)
     }
     if "--dry-run" in keys:
-        check_rsync_host()
+        check_rsync_host(exclude_dirs)
         keys.remove("--dry-run")
 
     for key in keys:
@@ -712,14 +727,15 @@ def check_param_run(keys: list[str], paths: list[str], exclude_exts: Optional[li
 
 
 @log_exceptions(log_message="Ошибка при проверке наличия файлов и директорий для переноса")
-def check_files_in_dirs() -> None:
+def check_files_in_dirs(exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Проверяет наличие файлов и директорий для переноса в  {AIRFLOW_DEPLOY_PATH}*.
     Если данных нет — логирует ошибку и завершает выполнение скрипта.
     """
     save_log(f"Запуск проверки наличия файлов и директорий для переноса в {AIRFLOW_DEPLOY_PATH}")
     files_in_dirs = 0
-    for elem_list_folders in LIST_FOLDERS:
+    folders_to_check = [f for f in LIST_FOLDERS if f not in (exclude_dirs or [])]
+    for elem_list_folders in folders_to_check:
         for _, dirs, files in os.walk(f"{AIRFLOW_DEPLOY_PATH}{elem_list_folders}"):
             files_in_dirs += len(files)
             files_in_dirs += len(dirs)
@@ -861,7 +877,7 @@ def get_freed_space_by_delete(full_paths: list[str], data_host: str):
         freed_by_delete += mb
         save_log(f"Удаление {path} освободит {mb:.3f} mb на сервере {data_host}", info_level=True)
 
-def check_required_space_and_percent(full_paths: list[str], data_host: str, keys: list[str], exclude_exts: Optional[list[str]]) -> None:
+def check_required_space_and_percent(full_paths: list[str], data_host: str, keys: list[str], exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Считает, сколько потребуется места после деплоя, и проверяет процент занятого места.
     Выводит соответствующие логи и ошибки.
@@ -869,7 +885,9 @@ def check_required_space_and_percent(full_paths: list[str], data_host: str, keys
     used_deploy = 0
     local_files = {}
     for path in full_paths:
-        for root, _, files in os.walk(path):
+        for root, dirs, files in os.walk(path):
+            if exclude_dirs:
+                dirs[:] = [d for d in dirs if d not in exclude_dirs]
             for file in files:
                 if exclude_exts and any(file.endswith(ext) for ext in exclude_exts):
                     continue
@@ -951,6 +969,7 @@ def check_free_space(data_host: str,
                     paths: list[str],
                     keys: list[str],
                     exclude_exts: Optional[list[str]] = None,
+                    exclude_dirs: Optional[list[str]] = None,
                     action: Literal['push', 'delete'] = 'push') -> None:
     """
     Проверяет свободное место на разделе /app удалённого хоста и предупреждает,
@@ -968,11 +987,11 @@ def check_free_space(data_host: str,
         # get_freed_space_by_delete(full_paths, data_host)
         pass
     else:
-        check_required_space_and_percent(full_paths, data_host, keys, exclude_exts)
+        check_required_space_and_percent(full_paths, data_host, keys, exclude_exts, exclude_dirs)
 
 
 @log_exceptions("Ошибка при получении отпечатков файлов в директории", "root_dir")
-def get_dir_fingerprint_hashes(base_dir: str, root_dir: str, exclude_exts: Optional[list[str]] = None) -> dict[str, str]:
+def get_dir_fingerprint_hashes(base_dir: str, root_dir: str, exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> dict[str, str]:
     """
     Возвращает словарь отпечатков (mtime+size) для всех файлов в директории root_dir относительно base_dir.
     :param base_dir: Базовая директория для относительных путей.
@@ -981,7 +1000,9 @@ def get_dir_fingerprint_hashes(base_dir: str, root_dir: str, exclude_exts: Optio
     :return: dict {относительный_путь: fingerprint}
     """
     hashes = {}
-    for root, _, files in os.walk(root_dir):
+    for root, dirs, files in os.walk(root_dir):
+        if exclude_dirs:
+            dirs[:] = [d for d in dirs if d not in exclude_dirs]
         for file in files:
             if exclude_exts and any(file.endswith(ext) for ext in exclude_exts):
                 continue
@@ -1041,7 +1062,8 @@ def get_remote_fingerprint_hashes(host: str, path: str, is_dir: bool) -> dict[st
 
 @log_exceptions("Ошибка при проверке отпечатков между источником и целями")
 def check_hashes(paths: list[str], hosts: list[str],
-                 exclude_exts: Optional[list[str]] = None) -> bool:
+                 exclude_exts: Optional[list[str]] = None,
+                 exclude_dirs: Optional[list[str]] = None) -> bool:
     """
     Сравнивает отпечатки (mtime+size) между источником и целями.
 
@@ -1059,7 +1081,7 @@ def check_hashes(paths: list[str], hosts: list[str],
         is_dir = os.path.isdir(src_full)
 
         if is_dir:
-            src_hashes = get_dir_fingerprint_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts)
+            src_hashes = get_dir_fingerprint_hashes(AIRFLOW_DEPLOY_PATH, src_full, exclude_exts, exclude_dirs)
         else:
             rel = path
             try:
@@ -1081,13 +1103,14 @@ def check_hashes(paths: list[str], hosts: list[str],
     return all_ok
 
 
-def check_rsync_host() -> None:
+def check_rsync_host(exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Проверяет возможность синхронизации директорий с помощью rsync на указанный хост.
     """
+    folders_to_check = [f for f in LIST_FOLDERS if f not in (exclude_dirs or [])]
     for host_name in all_hosts:
         save_log(f"Запуск проверки запуска rsync на хосте: {host_name}")
-        for folder in LIST_FOLDERS:
+        for folder in folders_to_check:
             try:
                 chmod_string = get_chmod_string(folder)
                 command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}"
@@ -1097,7 +1120,7 @@ def check_rsync_host() -> None:
                 save_log(f"Ошибка при dry-run rsync для директории {folder} на хосте {host_name}: {str(e)}", with_exit=True)
 
 
-def host_checks(hostname: str, paths: list[str], keys: list[str], exclude_exts: Optional[list[str]] = None) -> None:
+def host_checks(hostname: str, paths: list[str], keys: list[str], exclude_exts: Optional[list[str]] = None, exclude_dirs: Optional[list[str]] = None) -> None:
     """
     Выполняет все проверки для одного хоста:
     - Проверка доступности (ping)
@@ -1116,13 +1139,13 @@ def host_checks(hostname: str, paths: list[str], keys: list[str], exclude_exts: 
         if "--delete" in keys:
             action = 'delete'
     connect_write(hostname)
-    check_free_space(hostname, paths, keys, exclude_exts, action=action)
+    check_free_space(hostname, paths, keys, exclude_exts, exclude_dirs, action=action)
     check_permissions(hostname)
     check_groups_users(hostname)
 
 
 @log_exceptions("Ошибка при парсинге аргументов командной строки")
-def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]:
+def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str], list[str]]:
     """
     Парсит аргументы командной строки для определения типа пути (файл или директория), а также для извлечения ключей.
     Аргументы:
@@ -1136,6 +1159,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
     keys = []
     paths = []
     exclude_exts = []
+    exclude_dirs = []
     i = 1
     argc = len(script_args)
     while i < argc:
@@ -1151,6 +1175,17 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
                 i += 2
             else:
                 save_log("Ошибка: ключ --exclude требует аргумент со списком расширений через запятую", with_exit=True)
+        elif arg == "--exclude-dir":
+            if i + 1 < argc and not script_args[i + 1].startswith('-'):
+                dirs = script_args[i + 1].split(",")
+                for d in dirs:
+                    d = d.strip()
+                    if d and not d.startswith('-'):
+                        exclude_dirs.append(d)
+                save_log(f"Добавлены директории для исключения: {exclude_dirs}", info_level=True)
+                i += 2
+            else:
+                save_log("Ошибка: ключ --exclude-dir требует аргумент со списком директорий через запятую", with_exit=True)
         elif arg.startswith('-'):
             keys.append(arg)
             i += 1
@@ -1158,7 +1193,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
             paths.append(f"{arg}")
             i += 1
     
-    if set(keys) <= {"-v", "--exclude"}:
+    if set(keys) <= {"-v", "--exclude", "--exclude-dir"}:
         keys.append("")
         for folder in LIST_FOLDERS:
             paths.append(f"{folder}")
@@ -1167,7 +1202,7 @@ def parse_args(script_args: list[str]) -> tuple[list[str], list[str], list[str]]
         for folder in LIST_FOLDERS:
             paths.append(f"{folder}")
 
-    return paths, keys, exclude_exts
+    return paths, keys, exclude_exts, exclude_dirs
 
 
 def timeout_handler():
@@ -1196,7 +1231,7 @@ def main() -> None:
     Основная функция скрипта, выполняющая синхронизацию директорий и проверку параметров.
     """
     save_log("Начало работы скрипта", info_level=True)
-    paths, keys, exclude_exts = parse_args(sys.argv)
+    paths, keys, exclude_exts, exclude_dirs = parse_args(sys.argv)
     key_allowed = is_key_combination_allowed(keys)
     if not key_allowed:
         save_log(f"Ошибка: недопустимая комбинация ключей: {keys}", with_exit=True)
@@ -1208,13 +1243,13 @@ def main() -> None:
 
 
     param_run_script(keys)
-    check_files_in_dirs()
+    check_files_in_dirs(exclude_dirs)
 
     for hostname in all_hosts:
-        host_checks(hostname, paths, keys, exclude_exts)
+        host_checks(hostname, paths, keys, exclude_exts, exclude_dirs)
 
 
-    check_param_run(keys, paths, exclude_exts)
+    check_param_run(keys, paths, exclude_exts, exclude_dirs)
     #TODO Временно отключаем проверку отпечатков
     # if any(key in keys for key in ["--dir", "--file", "-c", ""]):
     #     ok_status = check_hashes(paths, all_hosts, exclude_exts)
