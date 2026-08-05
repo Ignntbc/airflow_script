@@ -72,10 +72,8 @@ class SpinnerStreamHandler(logging.StreamHandler):
 
     def emit(self, record: logging.LogRecord) -> None:
         with self._spinner.lock:
-            # Очищаем линию спиннера перед записью лога
             sys.stdout.write("\r" + " " * 80 + "\r")
             super().emit(record)
-            # Перерисовываем спиннер после лога
             sys.stdout.write(f"\r⠋ {self._spinner._message}")
             sys.stdout.flush()
 

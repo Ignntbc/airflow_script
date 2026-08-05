@@ -13,6 +13,31 @@ import time
 import itertools
 
 
+
+
+CRITICAL_DISK_USAGE_PERCENT = 80
+ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--exclude-dir", "--copy"]
+RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
+RSYNC_CHECKSUM = "rsync --checksum -rogtpO"
+CHOWN_STRING = "--chown={{ airflow_deploy_suz_account.user }}:{{ airflow_tuz_account.user }}"
+CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
+AIRFLOW_PATH = "{{ airflow_dir.path }}/"
+AIRFLOW_DEPLOY_PATH = "{{ airflow_deploy_dir.path }}/"
+DESCRIPTION_JSON = "{{ description_dir.path }}/description.json"
+LOCAL_DEPLOY = "{{ airflow_deploy_suz_account.user }}@127.0.0.1"
+SSH_USER = "ssh {{ airflow_deploy_suz_account.user }}"
+CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=r,Fo="
+VERBOSE = "-v" in sys.argv
+LOCAL_TEST = False
+LOG_DIR = "{{ airflow_deploy_log_dir.path }}"
+LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy.log')
+LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
+LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
+LOG_MAX_SIZE = 10 * 10 * 1000  # 10 МБ
+LIST_FOLDERS = ["dags", "csv", "jar", "keys", "keytab", "scripts", "user_data"]
+
+
+
 class Spinner:
     """
     Анимированный спиннер для отображения прогресса в терминале.
@@ -71,34 +96,10 @@ class SpinnerStreamHandler(logging.StreamHandler):
 
     def emit(self, record: logging.LogRecord) -> None:
         with self._spinner.lock:
-            # Очищаем линию спиннера перед записью лога
             sys.stdout.write("\r" + " " * 80 + "\r")
             super().emit(record)
-            # Перерисовываем спиннер после лога
             sys.stdout.write(f"\r⠋ {self._spinner._message}")
             sys.stdout.flush()
-
-
-CRITICAL_DISK_USAGE_PERCENT = 80
-ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--exclude-dir", "--copy"]
-RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
-RSYNC_CHECKSUM = "rsync --checksum -rogtpO"
-CHOWN_STRING = "--chown={{ airflow_deploy_suz_account.user }}:{{ airflow_tuz_account.user }}"
-CHMOD_FG_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fg=rwx,Fu=rwx,Fo=rx"
-AIRFLOW_PATH = "{{ airflow_dir.path }}/"
-AIRFLOW_DEPLOY_PATH = "{{ airflow_deploy_dir.path }}/"
-DESCRIPTION_JSON = "{{ description_dir.path }}/description.json"
-LOCAL_DEPLOY = "{{ airflow_deploy_suz_account.user }}@127.0.0.1"
-SSH_USER = "ssh {{ airflow_deploy_suz_account.user }}"
-CHMOD_WITHOUT_FU_FO_STRING = "--chmod=Du=rwx,Dg=rwx,Do=rx,Fu=rw,Fg=r,Fo="
-VERBOSE = "-v" in sys.argv
-LOCAL_TEST = False
-LOG_DIR = "{{ airflow_deploy_log_dir.path }}"
-LOG_FILE_1 = os.path.join(LOG_DIR, 'deploy.log')
-LOG_FILE_2 = os.path.join(LOG_DIR, 'deploy_2.log')
-LOG_FILE_3 = os.path.join(LOG_DIR, 'deploy_3.log')
-LOG_MAX_SIZE = 10 * 10 * 1000  # 10 МБ
-LIST_FOLDERS = ["dags", "csv", "jar", "keys", "keytab", "scripts", "user_data"]
 
 
 def quote_local(path: str) -> str:
