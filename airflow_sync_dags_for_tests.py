@@ -2,6 +2,7 @@ import shutil
 import os
 from collections.abc import Callable
 import json
+import shlex
 import sys
 import subprocess
 import socket
@@ -9,7 +10,74 @@ import logging
 import threading
 from datetime import datetime
 from typing import List, Optional, Literal
+import time
+import itertools
 
+
+class Spinner:
+    """
+    Анимированный спиннер для отображения прогресса в терминале.
+    Работает в отдельном потоке (daemon), обновляя символ каждые interval секунд.
+    Потокобезопасно координируется с SpinnerStreamHandler через lock,
+    чтобы лог-сообщения не смешивались со спиннером.
+    """
+
+    def __init__(self, message: str = "Синхронизация...",
+                 chars: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏",
+                 interval: float = 0.1):
+        self._message = message
+        self._chars = chars
+        self._interval = interval
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._lock = threading.Lock()
+
+    @property
+    def lock(self) -> threading.Lock:
+        return self._lock
+
+    def _spin(self) -> None:
+        for char in itertools.cycle(self._chars):
+            if self._stop_event.is_set():
+                break
+            with self._lock:
+                sys.stdout.write(f"\r{char} {self._message}")
+                sys.stdout.flush()
+            time.sleep(self._interval)
+        with self._lock:
+            sys.stdout.write("\r" + " " * (len(self._message) + 4) + "\r")
+            sys.stdout.flush()
+
+    def start(self) -> None:
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join()
+
+
+class SpinnerStreamHandler(logging.StreamHandler):
+    """
+    StreamHandler, координированный со спиннером через общий lock.
+    Перед записью лог-строки очищает линию спиннера,
+    после — перерисовывает спиннер, чтобы анимация продолжилась без артефактов.
+    """
+
+    def __init__(self, stream, spinner: Spinner):
+        super().__init__(stream)
+        self._spinner = spinner
+
+    def emit(self, record: logging.LogRecord) -> None:
+        with self._spinner.lock:
+            # Очищаем линию спиннера перед записью лога
+            sys.stdout.write("\r" + " " * 80 + "\r")
+            super().emit(record)
+            # Перерисовываем спиннер после лога
+            sys.stdout.write(f"\r⠋ {self._spinner._message}")
+            sys.stdout.flush()
 
 
 CRITICAL_DISK_USAGE_PERCENT = 80
@@ -17,8 +85,6 @@ CRITICAL_DISK_USAGE_PERCENT = 80
 ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--exclude-dir", "--copy"]
 
 
-RSYNC_CHECKSUM_STRING = 'rsync --checksum -rogtpO --rsync-path="mkdir -p'
-RSYNC_CHECKSUM_DR_STRING = 'rsync --checksum -nrogtpO --rsync-path="mkdir -p'
 RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
 RSYNC_CHECKSUM = "rsync --checksum -rogtpO"
 CHOWN_STRING = "--chown=airflow_deploy:airflow"
@@ -33,6 +99,56 @@ VERBOSE = "-v" in sys.argv
 
 LOCAL_TEST = True
 list_folders = ["dags","csv", "jar", "keys", "keytab", "scripts", "user_data"]
+
+
+def quote_local(path: str) -> str:
+    """
+    Экранирует аргумент для локальной оболочки (subprocess с shell=True).
+    """
+    return shlex.quote(path)
+
+
+def quote_remote(path: str) -> str:
+    """
+    Экранирует аргумент, который будет разобран дважды: локальной оболочкой,
+    а затем удалённой (ssh склеивает аргументы в строку, rsync отдаёт путь remote shell).
+    """
+    return shlex.quote(shlex.quote(path))
+
+
+def quote_remote_command(command: str) -> str:
+    """
+    Оборачивает готовую команду для удалённой оболочки, чтобы локальная её не разбирала.
+    Аргументы внутри command должны быть уже экранированы через quote_local.
+    """
+    return shlex.quote(command)
+
+
+def rsync_remote_dest(host_prefix: str, path: str) -> str:
+    """
+    Формирует удалённый приёмник rsync вида host:/path с учётом двойного разбора оболочками.
+    """
+    return shlex.quote(f"{host_prefix}{shlex.quote(path)}")
+
+
+def rsync_path_option(remote_dir: str) -> str:
+    """
+    Формирует опцию --rsync-path с предварительным созданием каталога на удалённом хосте.
+    Путь экранируется для удалённой оболочки, значение опции — для локальной.
+    """
+    inner_command = "mkdir -p " + shlex.quote(remote_dir) + " && rsync"
+    return "--rsync-path=" + shlex.quote(inner_command)
+
+
+def exclude_arguments(exclude_exts: Optional[list[str]] = None,
+                    exclude_dirs: Optional[list[str]] = None) -> str:
+    """
+    Собирает строку с --exclude паттернами для rsync.
+    Паттерны обрабатываются локальным rsync, поэтому достаточно локального экранирования.
+    """
+    patterns = [f"*{ext}" for ext in (exclude_exts or [])]
+    patterns += [f"{d}/" for d in (exclude_dirs or [])]
+    return ' '.join(f"--exclude={quote_local(pattern)}" for pattern in patterns)
 
 
 def is_dir_allowed(path: str) -> bool:
@@ -187,8 +303,8 @@ def setup_logger() -> logging.Logger:
     logger_obj.setLevel(level)
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 
-    # stdout handler
-    sh = logging.StreamHandler(sys.stdout)
+    # stdout handler — координируется со спиннером
+    sh = SpinnerStreamHandler(sys.stdout, spinner)
     sh.setFormatter(formatter)
     logger_obj.addHandler(sh)
 
@@ -199,6 +315,7 @@ def setup_logger() -> logging.Logger:
 
     return logger_obj
 
+spinner = Spinner("Синхронизация...")
 logger = setup_logger()
 
 def save_log(message: str,
@@ -379,7 +496,7 @@ def check_permission_dir_and_files(find_cmd: str,
     result = result_str.split("\n")
     for item in result:
         if item.strip():
-            perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {item}", f"Проверка прав доступа: {item} на хосте {host}")
+            perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {quote_remote(item)}", f"Проверка прав доступа: {item} на хосте {host}")
             save_log(f"{error_prefix} {host} {perm_error}", with_exit=True)
     save_log(f"Результат проверки разрешённых директорий на хосте {host}: завершено без исключений")
 
@@ -416,7 +533,7 @@ def check_param_delete_key(
         else:
             for host in all_hosts:
                 try:
-                    run_command_with_log(f"{SSH_USER}@{host} rm -rf {path}", f"Удаление файла/директории: {path} на хосте {host}")
+                    run_command_with_log(f"{SSH_USER}@{host} rm -rf {quote_remote(path)}", f"Удаление файла/директории: {path} на хосте {host}")
                     save_log(f"Удалён файл/директория: {path} на хосте {host}", info_level=True)
                 except Exception as e:
                     save_log(f"{current_datetime} {real_name} Ошибка при удалении {path} на хосте {host}: {str(e)}\n\n", with_exit=True)
@@ -457,18 +574,21 @@ def check_param_file_key(
         hosts = get_hosts()
         for host in hosts:
             host_prefix = f"airflow_deploy@{host}:"
+            target_path = f"{AIRFLOW_PATH}{path}"
+            source_arg = quote_local(airflow_deploy_dir_path)
+            dest_arg = rsync_remote_dest(host_prefix, target_path)
             save_log(f"Запуск rsync для деплоя файла: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
             try:
                 if path.count("/") > 1:
                     run_command_with_log(
-                        f'{RSYNC_CHECKSUM_STRING} {AIRFLOW_PATH}{temp_folder_path} && rsync" {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}',
-                        f"Деплой файла:  {AIRFLOW_PATH}{path} на хосте {host}",
+                        f"{RSYNC_CHECKSUM} {rsync_path_option(f'{AIRFLOW_PATH}{temp_folder_path}')} {CHOWN_STRING} {chmod_string} {source_arg} {dest_arg}",
+                        f"Деплой файла:  {target_path} на хосте {host}",
                     )
                     save_log(f"Файл успешно скопирован: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
                 else:
                     run_command_with_log(
-                        f"{RSYNC_CHECKSUM} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path} {host_prefix}{AIRFLOW_PATH}{path}",
-                        f"Деплой файла:  {AIRFLOW_PATH}{path} на хосте {host}",
+                        f"{RSYNC_CHECKSUM} {CHOWN_STRING} {chmod_string} {source_arg} {dest_arg}",
+                        f"Деплой файла:  {target_path} на хосте {host}",
                     )
                     save_log(f"Файл успешно скопирован: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
             except Exception as e:
@@ -488,7 +608,7 @@ def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[s
         host_name (str): Имя или IP-адрес удалённого хоста, на котором будет производиться очистка.
     """
     save_log(f"Запуск удаления содержимого директории: {AIRFLOW_PATH}{elem} на хосте {host_name}", info_level=True)
-    items_str = run_command_with_log(f"{SSH_USER}@{host_name} ls -a {AIRFLOW_PATH}{elem}/", f"Получение списка элементов в {AIRFLOW_PATH}{elem} на хосте {host_name}")
+    items_str = run_command_with_log(f"{SSH_USER}@{host_name} ls -a {quote_remote(f'{AIRFLOW_PATH}{elem}/')}", f"Получение списка элементов в {AIRFLOW_PATH}{elem} на хосте {host_name}")
     items = [x for x in items_str.split("\n") if x not in {".", "..", ""}]
     if elem == "dags":
         for item in items:
@@ -499,15 +619,17 @@ def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[s
                 continue
             if exclude_dirs and item in exclude_dirs:
                 continue
-            result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/{item}", f"Удаление: {AIRFLOW_PATH}dags/{item} на хосте {host_name}", info_level=True)
+            result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {quote_remote(f'{AIRFLOW_PATH}dags/{item}')}", f"Удаление: {AIRFLOW_PATH}dags/{item} на хосте {host_name}", info_level=True)
             save_log(f"Результат удаления {AIRFLOW_PATH}dags/{item} на хосте {host_name}: {result.strip()}", info_level=True)
-        result_sql = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {AIRFLOW_PATH}dags/sql/*", f"Удаление SQL-файлов в директории dags/sql на хосте {host_name}", info_level=True)
+        # глоббинг должен выполниться только удалённой оболочкой, поэтому * остаётся вне кавычек пути
+        sql_command = f"rm -rfv {quote_local(f'{AIRFLOW_PATH}dags/sql/')}*"
+        result_sql = run_command_with_log(f"{SSH_USER}@{host_name} {quote_remote_command(sql_command)}", f"Удаление SQL-файлов в директории dags/sql на хосте {host_name}", info_level=True)
         save_log(f"Результат удаления SQL-файлов на хосте {host_name}: {result_sql.strip()}", info_level=True)
     else:
         for item in items:
             if exclude_dirs and item in exclude_dirs:
                 continue
-            result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rf {AIRFLOW_PATH}{elem}/{item}", f"Удаление: {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}", info_level=True)
+            result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rf {quote_remote(f'{AIRFLOW_PATH}{elem}/{item}')}", f"Удаление: {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}", info_level=True)
             save_log(f"Результат удаления {AIRFLOW_PATH}{elem}/{item} на хосте {host_name}: {result.strip()}", info_level=True)
 
 
@@ -611,29 +733,26 @@ def check_param_dir_key(
 
         chmod_string = get_chmod_string(path)
 
-        exclude_args = ""
-
-        if exclude_exts:
-            exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
-        if exclude_dirs:
-            exclude_args += ' ' + ' '.join([f'--exclude="{d}/"' for d in exclude_dirs])
+        exclude_args = exclude_arguments(exclude_exts, exclude_dirs)
+        source_arg = quote_local(f"{airflow_deploy_dir_path}/")
+        target_path = f"{AIRFLOW_PATH}{path}"
 
         for host in hosts:
+            dest_arg = rsync_remote_dest(host_prefix.format(host=host), target_path)
             if path.count("/") > 1:
                 rsync_command = (
-                    f'rsync --checksum -rogtpO --rsync-path="mkdir -p {AIRFLOW_PATH}{temp_folder_path} && rsync" '
-                    f'{exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ '
-                    f'{host_prefix.format(host=host)}{AIRFLOW_PATH}{path}'
+                    f"{RSYNC_CHECKSUM} {rsync_path_option(f'{AIRFLOW_PATH}{temp_folder_path}')} "
+                    f"{exclude_args} {CHOWN_STRING} {chmod_string} {source_arg} {dest_arg}"
                 )
                 run_command_with_log(
                     rsync_command,
-                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {target_path}\n\n",
                 )
                 save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
             else:
                 run_command_with_log(
-                    f"{RSYNC_CHECKSUM} {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix.format(host=host)}{AIRFLOW_PATH}{path}",
-                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {AIRFLOW_PATH}{path}\n\n",
+                    f"{RSYNC_CHECKSUM} {exclude_args} {CHOWN_STRING} {chmod_string} {source_arg} {dest_arg}",
+                    f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Добавлена директория:  {target_path}\n\n",
                 )
                 save_log(f"{current_datetime} {real_name} {host if CONFIGURATION == 'cluster' else ''} Директория успешно скопирована: {airflow_deploy_dir_path}\n\n", info_level=True)
 
@@ -648,21 +767,19 @@ def check_full_sync(exclude_exts: Optional[list[str]] = None, exclude_dirs: Opti
     save_log("Запуск полной синхронизации всех папок из list_folders", info_level=True)
     hosts = get_hosts()
     folders_to_sync = [f for f in list_folders if f not in (exclude_dirs or [])]
-    exclude_args = ""
-    if exclude_exts:
-        exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
-    if exclude_dirs:
-        exclude_args += ' ' + ' '.join([f'--exclude="{d}/"' for d in exclude_dirs])
+    exclude_args = exclude_arguments(exclude_exts, exclude_dirs)
 
     for folder in folders_to_sync:
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{folder}"
         chmod_string = get_chmod_string(folder)
         for host in hosts:
             host_prefix = f"airflow_deploy@{host}:"
+            source_arg = quote_local(f"{airflow_deploy_dir_path}/")
+            dest_arg = rsync_remote_dest(host_prefix, f"{AIRFLOW_PATH}{folder}")
             save_log(f"Синхронизация папки: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
             try:
                 run_command_with_log(
-                    f"{RSYNC_CHECKSUM} {exclude_args} {CHOWN_STRING} {chmod_string} {airflow_deploy_dir_path}/ {host_prefix}{AIRFLOW_PATH}{folder}",
+                    f"{RSYNC_CHECKSUM} {exclude_args} {CHOWN_STRING} {chmod_string} {source_arg} {dest_arg}",
                     f"Синхронизация папки: {AIRFLOW_PATH}{folder} на хосте {host}",
                 )
                 save_log(f"Папка успешно скопирована: {airflow_deploy_dir_path} на хосте {host}", info_level=True)
@@ -688,21 +805,19 @@ def check_param_copy_key(paths: list[str], exclude_exts: Optional[list[str]] = N
         airflow_deploy_dir_path = f"{AIRFLOW_DEPLOY_PATH}{path}"
         directory_check(airflow_deploy_dir_path)
         chmod_string = get_chmod_string(path)
-        exclude_args = ""
-        if exclude_exts:
-            exclude_args = ' '.join([f'--exclude="*{ext}"' for ext in exclude_exts])
-        if exclude_dirs:
-            exclude_args += ' ' + ' '.join([f'--exclude="{d}/"' for d in exclude_dirs])
+        exclude_args = exclude_arguments(exclude_exts, exclude_dirs)
+        source_arg = quote_local(f"{airflow_deploy_dir_path}/")
 
         for host in all_hosts:
             host_prefix = f"airflow_deploy@{host}:"
+            dest_arg = rsync_remote_dest(host_prefix, f"{AIRFLOW_PATH}{path}")
             save_log(
                 f"Синхронизация с удалением: {airflow_deploy_dir_path} -> {host}:{AIRFLOW_PATH}{path}",
                 info_level=True
             )
             rsync_command = (
                 f"{RSYNC_CHECKSUM} --delete {exclude_args} {CHOWN_STRING} {chmod_string} "
-                f"{airflow_deploy_dir_path}/ {host_prefix}{AIRFLOW_PATH}{path}"
+                f"{source_arg} {dest_arg}"
             )
             run_command_with_log(
                 rsync_command,
@@ -796,25 +911,25 @@ def check_permission_type(
     save_log(f"Запуск проверки {check_type} для {folder} на хосте {host}")
     folder_name = os.path.basename(folder.rstrip('/'))
     if check_type == "group":
-        cmd = f"{SSH_USER}@{host} find {folder} ! -group airflow"
+        cmd = f"{SSH_USER}@{host} find {quote_remote(folder)} ! -group airflow"
         log_prefix = "Проверка группы:"
     else:
-        cmd = f"{SSH_USER}@{host} find {folder} ! -user airflow ! -user airflow_deploy"
+        cmd = f"{SSH_USER}@{host} find {quote_remote(folder)} ! -user airflow ! -user airflow_deploy"
         log_prefix = "Проверка владельца:"
 
     save_log(f"{log_prefix} {cmd}")
     for_result = run_command_with_log(cmd, f"Проверка {check_type} на хосте {host} для {folder}").strip().split("\n") 
     for item in for_result:
         if len(item) > 2:
-            perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {item}", f"Ошибка при проверке группы или пользователя на хосте {host} для {item}")
+            perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {quote_remote(item)}", f"Ошибка при проверке группы или пользователя на хосте {host} для {item}")
             save_log(f"{error_msg} {item} {perm_error.strip()}", with_exit=True)
 
     save_log(f"Запуск проверки прав доступа для {folder} на хосте {host}")
     folder_name = os.path.basename(folder.rstrip('/'))
     if folder_name in ("keys", "keytab"):
-        perm_cmd = f"{SSH_USER}@{host} find {folder} -type f ! -perm 0600"
+        perm_cmd = f"{SSH_USER}@{host} find {quote_remote(folder)} -type f ! -perm 0600"
     else:
-        perm_cmd = f"{SSH_USER}@{host} find {folder} -type d ! -perm 0755 ! -perm 0775"
+        perm_cmd = f"{SSH_USER}@{host} find {quote_remote(folder)} -type d ! -perm 0755 ! -perm 0775"
     
     perm_error_prefix = f"Ошибка !!! Некорректные права для {folder} на хосте {host}"
 
@@ -822,7 +937,7 @@ def check_permission_type(
     perm_result = os.popen(perm_cmd).read().split("\n")
     for item in perm_result:
         if len(item) > 2:
-            perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {item}", f"Ошибка при проверке прав на хосте {host} для {item}")
+            perm_error = run_command_with_log(f"{SSH_USER}@{host} ls -l {quote_remote(item)}", f"Ошибка при проверке прав на хосте {host} для {item}")
             save_log(f"{perm_error_prefix} {item} {perm_error.strip()}", with_exit=True)
 
 
@@ -840,17 +955,17 @@ def check_groups_users(host: str) -> None:
         dir_path = f"{AIRFLOW_PATH}{folder}"
         if CONFIGURATION == "cluster":
             save_log(f"Проверка группы для директории: {dir_path} на хосте {host}")
-            find_group_cmd = f"{SSH_USER}@{host} find {dir_path} ! -group airflow"
+            find_group_cmd = f"{SSH_USER}@{host} find {quote_remote(dir_path)} ! -group airflow"
             check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа на хосте", host)
             save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-            find_user_cmd = f"{SSH_USER}@{host} find {dir_path} ! -user airflow ! -user airflow_deploy"
+            find_user_cmd = f"{SSH_USER}@{host} find {quote_remote(dir_path)} ! -user airflow ! -user airflow_deploy"
             check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец на хосте", host)
         else:
             save_log(f"Проверка группы для директории: {dir_path} на хосте {host}")
-            find_group_cmd = f"find {dir_path} ! -group airflow_deploy ! -group airflow"
+            find_group_cmd = f"find {quote_local(dir_path)} ! -group airflow_deploy ! -group airflow"
             check_permission_dir_and_files(find_group_cmd, "Ошибка !!! Некорректная группа", host)
             save_log(f"Проверка владельца для директории: {dir_path} на хосте {host}")
-            find_user_cmd = f"find {dir_path} ! -user airflow ! -user airflow_deploy"
+            find_user_cmd = f"find {quote_local(dir_path)} ! -user airflow ! -user airflow_deploy"
             check_permission_dir_and_files(find_user_cmd, "Ошибка !!! Некорректный владелец", host)
     save_log(f"Результат проверки групп и владельцев на хосте {host}: завершено без ошибок")
 
@@ -890,11 +1005,10 @@ def get_freed_space_by_delete(full_paths: list[str], data_host: str):
     freed_by_delete = 0
     for path in full_paths:
         rel_path = os.path.relpath(path, AIRFLOW_DEPLOY_PATH)
-        remote_find_cmd = (
-            SSH_USER + "@" + data_host +
-            " 'find " + AIRFLOW_PATH + rel_path +
-            " -type f -exec stat -c \"%s\" {} \\;'"
+        remote_command = (
+            f"find {quote_local(f'{AIRFLOW_PATH}{rel_path}')} -type f -exec stat -c %s {{}} +"
         )
+        remote_find_cmd = f"{SSH_USER}@{data_host} {quote_remote_command(remote_command)}"
         try:
             remote_out = get_stdout_from_cmd(remote_find_cmd)
         except Exception as e:
@@ -1063,17 +1177,13 @@ def get_remote_fingerprint_hashes(host: str, path: str, is_dir: bool) -> dict[st
     :return: dict {относительный_путь: fingerprint}
     """
     hashes: dict[str, str] = {}
+    target_path = f"{AIRFLOW_PATH}{path}"
+    stat_format = quote_local("%n %Y-%s")
     if is_dir:
-        remote_stat_cmd = (
-            SSH_USER + "@" + host +
-            " 'find " + AIRFLOW_PATH + path +
-            " -type f -exec stat -c \"%n %Y-%s\" {} \\;'"
-        )
+        remote_command = f"find {quote_local(target_path)} -type f -exec stat -c {stat_format} {{}} +"
     else:
-        remote_stat_cmd = (
-            f"{SSH_USER}@{host} "
-            f"'stat -c \"%n %Y-%s\" {AIRFLOW_PATH}{path}'"
-        )
+        remote_command = f"stat -c {stat_format} {quote_local(target_path)}"
+    remote_stat_cmd = f"{SSH_USER}@{host} {quote_remote_command(remote_command)}"
     try:
         remote_out = get_stdout_from_cmd(remote_stat_cmd)
     except Exception as e:
@@ -1150,7 +1260,9 @@ def check_rsync_host(exclude_dirs: Optional[list[str]] = None) -> None:
         for folder in folders_to_check:
             try:
                 chmod_string = get_chmod_string(folder)
-                command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {AIRFLOW_DEPLOY_PATH}{folder} airflow_deploy@{host_name}:{AIRFLOW_PATH}"
+                source_arg = quote_local(f"{AIRFLOW_DEPLOY_PATH}{folder}")
+                dest_arg = rsync_remote_dest(f"airflow_deploy@{host_name}:", AIRFLOW_PATH)
+                command = f"{RSYNC_DRY_RUN} {CHOWN_STRING} {chmod_string} {source_arg} {dest_arg}"
                 run_command_with_log(command, f"Проверка dry-run rsync для {folder} на хосте {host_name}", rsync_error=True)
                 save_log(f"Dry-run rsync для директории {folder} на хосте {host_name} выполнен успешно", info_level=True)
             except Exception as e:
@@ -1303,9 +1415,23 @@ def timer_setup(seconds: int = 300,
     return timer_thread
 
 if __name__ == "__main__":
+    spinner.start()
     timer = timer_setup(300, timeout_handler)
     timer.start()
     try:
         main()
+        spinner.stop()
+        print("\033[32m✔ Синхронизация завершена успешно\033[0m")
+    except SystemExit as e:
+        spinner.stop()
+        if e.code != 0:
+            print(f"\033[31m✘ Скрипт завершён с ошибкой (код {e.code})\033[0m")
+        else:
+            print("\033[32m✔ Синхронизация завершена успешно\033[0m")
+        raise
+    except Exception:
+        spinner.stop()
+        print("\033[31m✘ Скрипт завершён с ошибкой\033[0m")
+        raise
     finally:
         timer.cancel()
