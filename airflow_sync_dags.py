@@ -16,6 +16,7 @@ import itertools
 
 
 CRITICAL_DISK_USAGE_PERCENT = 80
+TIMER_DEFAULT = 600
 ALL_KEYS = ["--delete", "--file", "--dir", "-c", "-h", "--dry-run", "-v", "", "--exclude", "--exclude-dir", "--copy"]
 RSYNC_DRY_RUN = 'rsync --checksum -nrogtpO'
 RSYNC_CHECKSUM = "rsync --checksum -rogtpO"
@@ -605,10 +606,6 @@ def remote_delete_items(elem: str, host_name: str, exclude_exts: Optional[list[s
                 continue
             result = run_command_with_log(f"{SSH_USER}@{host_name} rm -rfv {quote_remote(f'{AIRFLOW_PATH}dags/{item}')}", f"Удаление: {AIRFLOW_PATH}dags/{item} на хосте {host_name}", info_level=True)
             save_log(f"Результат удаления {AIRFLOW_PATH}dags/{item} на хосте {host_name}: {result.strip()}", info_level=True)
-        # глоббинг должен выполниться только удалённой оболочкой, поэтому * остаётся вне кавычек пути
-        sql_command = f"rm -rfv {quote_local(f'{AIRFLOW_PATH}dags/sql/')}*"
-        result_sql = run_command_with_log(f"{SSH_USER}@{host_name} {quote_remote_command(sql_command)}", f"Удаление SQL-файлов в директории dags/sql на хосте {host_name}", info_level=True)
-        save_log(f"Результат удаления SQL-файлов на хосте {host_name}: {result_sql.strip()}", info_level=True)
     else:
         for item in items:
             if exclude_dirs and item in exclude_dirs:
@@ -860,7 +857,7 @@ def check_files_in_dirs(exclude_dirs: Optional[list[str]] = None) -> None:
             if files_in_dirs > 1:
                 break
 
-    if files_in_dirs <= 1:
+    if files_in_dirs < 1:
         save_log(f"{datetime.now()} {real_name} Ошибка !!! В прикладных директориях {AIRFLOW_DEPLOY_PATH} (dags/csv/jar/keys/keytab/scripts/user_data) отсутствуют данные для переноса", with_exit=True)
     else:
         save_log(f"Проверка наличия файлов для переноса завершена успешно. Найдено файлов/директорий: {files_in_dirs}")
@@ -1377,7 +1374,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     spinner.start()
-    timer = timer_setup(300, timeout_handler)
+    timer = timer_setup(TIMER_DEFAULT, timeout_handler)
     timer.start()
     try:
         main()
